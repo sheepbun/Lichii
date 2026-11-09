@@ -147,7 +147,6 @@ enum class Status {
     PushPhiArgument,
 };
 
-template <typename Type>
 struct ReadState {
     ReadState(IR::Block* block_) : block{block_} {}
     ReadState() = default;
@@ -169,11 +168,16 @@ public:
 
     template <typename Type>
     IR::Value ReadVariable(Type variable, IR::Block* root_block) {
+        // Most reads find a definition in their own block.
+        if (const IR::Value& def = current_def.Def(root_block, variable); !def.IsEmpty()) {
+            return def;
+        }
+        // Reused between reads (they never nest): one allocation per pass instead of per read.
         // TODO: Windows commits sodoku if you use small_vector
-        std::vector<ReadState<Type>> stack{
-            ReadState<Type>(nullptr),
-            ReadState<Type>(root_block),
-        };
+        std::vector<ReadState>& stack = read_stack;
+        stack.clear();
+        stack.emplace_back(nullptr);
+        stack.emplace_back(root_block);
         const auto prepare_phi_operand{[&] {
             if (stack.back().pred_it == stack.back().pred_end) {
                 IR::Inst* const phi{stack.back().phi};
@@ -302,6 +306,7 @@ private:
 
     // TODO: Windows dies with stack exhaustion?
     std::unordered_map<IR::Block*, std::map<Variant, IR::Inst*>> incomplete_phis;
+    std::vector<ReadState> read_stack;
     DefTable current_def;
 };
 
