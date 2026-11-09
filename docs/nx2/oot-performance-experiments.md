@@ -307,3 +307,20 @@ waiting for command lists. Guest cores are about 50% idle in
 which release command chunks as they finish writing them. Next: the guest
 side (single-thread speed of those threads, host core placement) and
 the 7.7 ms per-frame CPU phase before the GPU work starts.
+
+Prediction check (`28d7b7a5d9`, `EDEN_NX2_RELEASE_VERIFY=1`): `C4_i_verify_fixed`
+and `C4_i_verify_walk` checked 954,368 retiring releases across boot, menus and
+gameplay. None mismatched its prediction and none were dropped. Only Ocarina of
+Time is installed here; run the switch on other Switch 2 titles before relying
+on it for them. If a title writes queued semaphore words from the CPU, drop the
+word's queued entries when the CPU write is seen.
+
+## C4-07: host thread placement and EPP (inconclusive)
+
+`C4_h_hostab` alternated 15 s fixed-view windows within one run on the
+retained build. Five as-is windows measured 30.94-33.03 FPS (mean 32.22).
+Pinning (GPUBack to CPU 4, GPU to 5, SMT siblings 12/13 idle, guest cores to
+0-3/6/7, everything else to the remaining siblings) gave 32.45 and 33.37.
+EPP `performance` gave 32.69 and 31.45. Both together gave a single 34.11.
+Within-run drift (±3%) is as large as any of these, so no code change
+follows; EPP was restored to `balance_performance`.
