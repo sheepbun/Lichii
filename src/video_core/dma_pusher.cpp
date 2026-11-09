@@ -220,7 +220,7 @@ bool DmaPusher::Step() {
         }
         // A resumed entry is read again: the words after the acquire may be new by now.
         // A safe read flushes the caches, which belong to the split's back thread while it runs
-        // (the split only starts with unsafe reads; the settings can change mid-game).
+        // (the split does not run with Safe DMA; the settings can change mid-game).
         const bool use_safe = !VideoCommon::GpuSplit::Get().Active() &&
                               (Settings::IsDMALevelDefault() ? Settings::IsGPULevelHigh() : Settings::IsDMALevelSafe());
         if (!gpu_written && VideoCommon::GpuSplit::Get().Active() &&
