@@ -1,7 +1,7 @@
 # GPU split hangs and fence-mode freezes
 
 Use when a run freezes at 0 fps, or the log loops on a wait, with the GPU thread split on
-(fast GPU accuracy). The split runs engine methods on a back thread ("GPUBack"); the front
+(any GPU accuracy; only Safe DMA accuracy turns it off). The split runs engine methods on a back thread ("GPUBack"); the front
 parses command lists and, with `EDEN_NX2_SPLIT=2`, runs macros.
 
 ## Signatures in the log
@@ -10,7 +10,7 @@ parses command lists and, with `EDEN_NX2_SPLIT=2`, runs macros.
 |---|---|---|
 | `WaitSubmitted: Waited N s for the GPU thread to submit tick T` (repeating) | A non-back thread (fencing thread, CPU reading command lists) waits for a tick the back deferred (`Scheduler::DeferFlush`) and never submits | The back is blocked waiting on that same thread, or the back's state is stale |
 | `CanResumeAcquire: Channel N waits on semaphore ... (op 1, X, now Y)` on several channels, each a few releases behind | Semaphore releases are queued behind fences that never pop | A fence change that delays the release (`delay_fence`, download-delayed fences), or an acquire recheck that never fences again (invariant below) |
-| `GPU thread split: stopped` then `engine methods run on a second thread` mid-run | The user switched GPU accuracy (accurate stops the split, fast restarts it) | State the front kept across the stop |
+| `GPU thread split: stopped` then `engine methods run on a second thread` mid-run | The user switched DMA accuracy (Safe stops the split, Default or Unsafe restarts it) | State the front kept across the stop |
 | SEGV after `Shutdown requested` / `failed to stop` | Teardown of a hung run | Ignore; debug the first stall line |
 
 ## Invariants the split relies on

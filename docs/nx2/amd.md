@@ -47,8 +47,8 @@ Check these before filing a new one.
 
 ## Settings for AMD users
 
-- Keep the split GPU thread on (`EDEN_NX2_SPLIT=2`, the default in `nx2_switches.txt`) and GPU
-  accuracy below High, which turns the split off. Textures flickering in that setup on an RX 9070
+- Keep the split GPU thread on (`EDEN_NX2_SPLIT=2`, the default in `nx2_switches.txt`) and DMA
+  accuracy below Safe, which turns the split off. Textures flickering in that setup on an RX 9070
   XT ([#163]) were fixed by [#425].
 - Logging at `*:Info` costs CPU time in busy scenes. Use `*:Error` when you compare frame rates
   ([#403]).

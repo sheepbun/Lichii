@@ -125,8 +125,9 @@ tr -d '\000' < $LOG | grep -a -E "LogSettings: M- Renderer.gpu_accuracy|GPU thre
   thread`, is a fence/split deadlock: see `references/gpu-split-hangs.md` for the signatures,
   the split invariants and how to get live stacks.
 - `GPU thread split: stopped` / `engine methods run on a second thread` mid-log means the user
-  switched GPU accuracy during the run. Reproduce that sequence (`gpu high`/`gpu low` in
-  `keys.txt`) before theorising, and ask the user what they did around the event if the log
+  switched DMA accuracy to or from Safe during the run (builds before the accurate-GPU split
+  stopped it on a GPU accuracy switch too: `gpu high`/`gpu low` in `keys.txt`). Reproduce that
+  sequence before theorising, and ask the user what they did around the event if the log
   doesn't show it.
 
 ## Pitfalls
@@ -144,8 +145,9 @@ tr -d '\000' < $LOG | grep -a -E "LogSettings: M- Renderer.gpu_accuracy|GPU thre
 - **Fixed boot sleeps waste most of a run.** Time a title once with a capture every 10 s (luma
   shows black/title/load/gameplay), then press at those points and poll `capture` luma for the
   first gameplay frame instead of sleeping.
-- **Reproducing a hang after a mid-game settings switch:** accurate GPU mode stops the GPU split
-  and fast mode restarts it. Write `gpu high`, then `gpu low`, to `keys.txt`, and run with
+- **Reproducing a hang after a mid-game settings switch:** Safe DMA accuracy stops the GPU split
+  and Default or Unsafe restarts it (GPU accuracy no longer does). For a GPU accuracy switch,
+  write `gpu high`, then `gpu low`, to `keys.txt`, and run with
   `--env EDEN_NX2_SPLIT_VERIFY=1`: "Split front register" warnings right after the restart mean the
   front's macro state went stale. The verifier resyncs what it finds, so verified runs don't hang;
   compare the difference counts instead.
