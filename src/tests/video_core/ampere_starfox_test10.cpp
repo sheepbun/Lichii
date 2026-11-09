@@ -475,14 +475,22 @@ TEST_CASE("Star Fox signed register shift keeps other funnel modes rejected",
     for (const auto change : std::array{
              std::array{24U, 8U, 3U}, std::array{73U, 2U, 0U}, std::array{73U, 2U, 1U},
              std::array{76U, 1U, 0U}, std::array{80U, 1U, 0U}, std::array{72U, 1U, 1U},
-             std::array{32U, 16U, 0x125U}, std::array{0U, 12U, 0xc19U},
-             std::array{96U, 1U, 1U}}) {
+             std::array{32U, 16U, 0x125U}, std::array{96U, 1U, 1U}}) {
         auto instruction = CapturedShift;
         SetBits(instruction, change[0], change[1], change[2]);
         const auto lowered = LowerToMaxwell(std::array{instruction, Exit});
         CHECK_FALSE(lowered);
         CHECK(lowered.instructions.empty());
     }
+    // The uniform-shift form (0xc19, from upstream 587633debe) clamps UR5's mirror, R221.
+    auto uniform = CapturedShift;
+    SetBits(uniform, 0, 12, 0xc19);
+    SetBits(uniform, 32, 8, 5);
+    SetBits(uniform, 91, 1, 1);
+    const auto lowered = LowerToMaxwell(std::array{uniform, Exit});
+    INFO(lowered.error);
+    REQUIRE(lowered);
+    CHECK(((lowered.instructions.front() >> 8) & 0xff) == 221);
 }
 
 TEST_CASE("Star Fox array gather preserves layer coordinates components and split destinations",

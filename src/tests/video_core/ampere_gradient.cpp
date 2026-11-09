@@ -164,9 +164,16 @@ TEST_CASE("Ampere signed high-word shifts keep sign extension", "[video_core][am
     }};
     const auto lowered = Shader::Ampere::LowerToMaxwell(code);
     REQUIRE(static_cast<bool>(lowered));
-    REQUIRE(((lowered.instructions[0] >> 8) & 0xff) == 68);
-    REQUIRE(((lowered.instructions[0] >> 20) & 0xff) == 37);
-    REQUIRE(((lowered.instructions[0] >> 48) & 1) == 1);
+    // Lichii clamps the shift to 31 first (IMNMX R250, R37, 31) and shifts by R250 with .W, as
+    // Maxwell SHR without .W does for 32 or more: the same sign-filled result.
+    REQUIRE((lowered.instructions[0] >> 52) == 0x382);
+    REQUIRE((lowered.instructions[0] & 0xff) == 250);
+    REQUIRE(((lowered.instructions[0] >> 8) & 0xff) == 37);
+    REQUIRE(((lowered.instructions[0] >> 20) & 0x7ffff) == 31);
+    REQUIRE((lowered.instructions[1] >> 52) == 0x5c2);
+    REQUIRE(((lowered.instructions[1] >> 8) & 0xff) == 68);
+    REQUIRE(((lowered.instructions[1] >> 20) & 0xff) == 250);
+    REQUIRE(((lowered.instructions[1] >> 48) & 1) == 1);
 }
 
 TEST_CASE("Ampere uniform multiply accepts an immediate addend", "[video_core][ampere]") {

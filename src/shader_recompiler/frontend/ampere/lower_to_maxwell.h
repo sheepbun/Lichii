@@ -1630,9 +1630,12 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
                 right_shift_u64_low(static_cast<u32>(dest), low, high, shift);
                 break;
             }
-            if (opcode == 0x219 && low == 255 && shift_operand &&
-                (insn.words[2] & ~0x8ffU) == 0x00011400U &&
+            // SHF.R.S32.HI Rd, RZ, s, Rhigh, with s in a register, a constant buffer or a uniform
+            // (the last two from upstream 587633debe).
+            if (low == 255 && shift_operand && shift != ~0U &&
+                (insn.words[2] & ~(0x8ffU | (opcode == 0xc19 ? 0x08000000U : 0U))) == 0x00011400U &&
                 !(insn.words[3] & 0xc00001ffU)) {
+                load_shift();
                 const bool wrap = insn.Bits(75, 1) != 0;
                 if (!wrap)
                     emit(0x3820000000000000ULL | predicate | 250 | (u64{shift} << 8) |
