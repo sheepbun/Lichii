@@ -511,7 +511,8 @@ TEST_CASE("Ampere half per-tap gathers round and pack each pair in low-high orde
 
 TEST_CASE("Logged half textures retain unsupported-mode rejections",
           "[video_core][ampere][logged_textures]") {
-    for (const u32 bit : {76U, 77U, 78U, 80U, 91U}) {
+    // Bit 77 alone makes a per-tap gather, lowered with runtime offsets.
+    for (const u32 bit : {76U, 78U, 80U, 91U}) {
         auto invalid{Gathers[0]};
         invalid.words[bit / 32] ^= 1U << (bit % 32);
         CHECK_FALSE(Shader::Ampere::LowerToMaxwell(std::array{invalid, Exit}));
@@ -663,9 +664,16 @@ TEST_CASE("Half per-tap gathers prove offsets across an unrelated LEA.HI",
     const auto lowered = Shader::Ampere::LowerToMaxwell(code);
     INFO(lowered.error);
     REQUIRE(lowered);
+    // With R1 rewritten the offsets are not constant: they are copied for a runtime per-tap gather.
     code[2].words[0] = 0x08017211;
-    CHECK(Shader::Ampere::LowerToMaxwell(code).error ==
-          "native per-tap gather nonconstant offsets");
+    const auto dynamic = Shader::Ampere::LowerToMaxwell(code);
+    INFO(dynamic.error);
+    REQUIRE(dynamic);
+    for (u32 i = 0; i < 2; ++i)
+        CHECK(std::ranges::any_of(dynamic.instructions, [&](u64 word) {
+            return (word & ~(15ULL << 16)) ==
+                   (0x5c98000000000000ULL | (248 + i) | (15ULL << 39) | (u64{i} << 20));
+        }));
 }
 
 TEST_CASE("Per-tap gathers with runtime offsets gather each tap at its own offset",

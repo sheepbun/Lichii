@@ -138,7 +138,9 @@ TEST_CASE("Ampere gathers keep coordinate pairs below reserved registers", "[vid
                 std::array{gather, exit}, mode.high_uniforms);
             if (mode.pair && source == mode.boundary - 1) {
                 REQUIRE_FALSE(static_cast<bool>(lowered));
-                REQUIRE(lowered.error == "native texture gather mode");
+                // Lichii checks the uniform-handle array form separately, with its own message.
+                REQUIRE((lowered.error == "native texture gather mode" ||
+                         lowered.error == "native uniform array texture gather mode"));
                 REQUIRE(lowered.instructions.empty());
                 continue;
             }
@@ -164,9 +166,16 @@ TEST_CASE("Ampere signed high-word shifts keep sign extension", "[video_core][am
     }};
     const auto lowered = Shader::Ampere::LowerToMaxwell(code);
     REQUIRE(static_cast<bool>(lowered));
-    REQUIRE(((lowered.instructions[0] >> 8) & 0xff) == 68);
-    REQUIRE(((lowered.instructions[0] >> 20) & 0xff) == 37);
-    REQUIRE(((lowered.instructions[0] >> 48) & 1) == 1);
+    // Lichii clamps the shift to 31 first (IMNMX R250, R37, 31) and shifts by R250 with .W, as
+    // Maxwell SHR without .W does for 32 or more: the same sign-filled result.
+    REQUIRE((lowered.instructions[0] >> 52) == 0x382);
+    REQUIRE((lowered.instructions[0] & 0xff) == 250);
+    REQUIRE(((lowered.instructions[0] >> 8) & 0xff) == 37);
+    REQUIRE(((lowered.instructions[0] >> 20) & 0x7ffff) == 31);
+    REQUIRE((lowered.instructions[1] >> 52) == 0x5c2);
+    REQUIRE(((lowered.instructions[1] >> 8) & 0xff) == 68);
+    REQUIRE(((lowered.instructions[1] >> 20) & 0xff) == 250);
+    REQUIRE(((lowered.instructions[1] >> 48) & 1) == 1);
 }
 
 TEST_CASE("Ampere uniform multiply accepts an immediate addend", "[video_core][ampere]") {
@@ -195,22 +204,45 @@ TEST_CASE("Ampere dual predicate LUTs read original inputs and preserve their gu
             predicates[1] = input & 2;
             predicates[7] = true;
             const auto before = predicates;
-            std::array<bool, 256> registers{};
+            std::array<u32, 256> registers{};
             const auto pred = [&](u32 encoded) { return predicates[encoded & 7] != bool(encoded & 8); };
+            const auto reg = [&](u64 word, u32 bit) { return registers[(word >> bit) & 255]; };
+            // Lichii computes both tables into registers and writes the two predicates with one
+            // guarded R2P, so a guard that is also a destination is read before either write.
             for (const u64 word : lowered.instructions) {
                 if ((word >> 56) == 0xe3) continue; // EXIT
                 if (!pred((word >> 16) & 15)) continue;
-                if ((word >> 52) == 0x39a) {
+                const u64 op = word >> 52;
+                if (op == 0x39a) {
                     // SEL Rd, RZ, -1, P: select zero when P is true.
-                    registers[word & 255] = !pred((word >> 39) & 15);
+                    registers[word & 255] = pred((word >> 39) & 15) ? 0U : ~0U;
+                } else if (op == 0x5be) {
+                    // LOP3.LUT, to a register or (bits 36-37 = 3) to the predicate at 48.
+                    const u32 a = reg(word, 8), b = reg(word, 20), c = reg(word, 39);
+                    u32 value = 0;
+                    for (u32 bit = 0; bit < 32; ++bit) {
+                        const u32 index = (((a >> bit) & 1) << 2) | (((b >> bit) & 1) << 1) |
+                                          ((c >> bit) & 1);
+                        value |= static_cast<u32>((word >> (28 + index)) & 1) << bit;
+                    }
+                    if (((word >> 36) & 3) == 3) {
+                        const u32 destination = (word >> 48) & 7;
+                        if (destination != 7) predicates[destination] = value != 0;
+                    } else {
+                        registers[word & 255] = value;
+                    }
+                } else if (op == 0x040) {
+                    REQUIRE(((word >> 53) & 3) == 0); // LOP32I.AND
+                    registers[word & 255] = reg(word, 8) & static_cast<u32>(word >> 20);
+                } else if (op == 0x5c4) {
+                    REQUIRE(((word >> 41) & 3) == 1); // LOP.OR
+                    registers[word & 255] = reg(word, 8) | reg(word, 20);
                 } else {
-                    REQUIRE((word >> 52) == 0x5be);
-                    const u32 index = (registers[(word >> 8) & 255] ? 4U : 0U) |
-                                      (registers[(word >> 20) & 255] ? 2U : 0U) |
-                                      (registers[(word >> 39) & 255] ? 1U : 0U);
-                    const bool value = (word >> (28 + index)) & 1;
-                    const u32 destination = (word >> 48) & 7;
-                    if (destination != 7) predicates[destination] = value;
+                    REQUIRE(op == 0x38f); // R2P PR, Ra, mask
+                    const u32 mask = static_cast<u32>(word >> 20) & 0x7f;
+                    for (u32 index = 0; index < 7; ++index) {
+                        if (mask & (1U << index)) predicates[index] = (reg(word, 8) >> index) & 1;
+                    }
                 }
             }
             const bool active = before[guard & 7] != bool(guard & 8);

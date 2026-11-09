@@ -19,6 +19,17 @@ u64 Copy(u64 predicate, u32 target, u32 source) {
     return 0x5c98000000000000ULL | predicate | target | (15ULL << 39) | (u64{source} << 20);
 }
 
+// Offsets not proven constant are copied into R248, R249 for TLD4.PTP: the SPIR-V backend
+// gathers each tap with its own runtime offset (upstream 993a31c593).
+bool CopiesOffsets(const Shader::Ampere::LoweredProgram& lowered, u32 source) {
+    const auto has = [&](u32 target, u32 reg) {
+        return std::ranges::any_of(lowered.instructions, [&](u64 word) {
+            return (word & ~(15ULL << 16)) == Copy(0, target, reg);
+        });
+    };
+    return static_cast<bool>(lowered) && has(248, source) && has(249, source + 1);
+}
+
 u64 MoveImmediate(u64 predicate, u32 target, u32 value) {
     return 0x0100000000000000ULL | predicate | target | (15ULL << 12) | (u64{value} << 20);
 }
@@ -82,24 +93,22 @@ TEST_CASE("Ampere per-tap gathers prove constants across unrelated arithmetic an
     REQUIRE(lowered);
     auto clobber = code;
     clobber[2].words[0] = 0x00067421;
-    REQUIRE(LowerToMaxwell(clobber).error == "native per-tap gather nonconstant offsets");
+    REQUIRE(CopiesOffsets(LowerToMaxwell(clobber), 6));
     clobber = code;
     clobber[3].words[0] = 0x04067b63;
-    REQUIRE(LowerToMaxwell(clobber).error == "native per-tap gather offset clobber");
+    REQUIRE(CopiesOffsets(LowerToMaxwell(clobber), 6));
     clobber = code;
     clobber[3].words[2] = 0x041e0f06;
-    REQUIRE(LowerToMaxwell(clobber).error == "native per-tap gather offset clobber");
+    REQUIRE(CopiesOffsets(LowerToMaxwell(clobber), 6));
     auto branch = code;
     branch[2].words = {0x00007947, 0, 0x03800000, 0};
-    REQUIRE(LowerToMaxwell(branch).error == "native per-tap gather control-flow proof");
+    REQUIRE(CopiesOffsets(LowerToMaxwell(branch), 6));
 }
 
-TEST_CASE("Ampere per-tap gathers reject unproven offsets and unsupported modes",
+TEST_CASE("Ampere per-tap gathers copy unproven offsets and reject unsupported modes",
           "[video_core][ampere][gather]") {
     // The captured instruction alone has no visible offset definitions.
-    const auto alone = LowerToMaxwell(std::array{CapturedPerTapGather, Exit});
-    REQUIRE_FALSE(alone);
-    REQUIRE(alone.error == "native per-tap gather missing offsets");
+    REQUIRE(CopiesOffsets(LowerToMaxwell(std::array{CapturedPerTapGather, Exit}), 8));
     // Offsets are signed 6-bit values, one per byte.
     for (const u32 value : {32U, 127U, 128U, 223U}) {
         for (u32 shift = 0; shift < 32; shift += 8) {
@@ -116,10 +125,10 @@ TEST_CASE("Ampere per-tap gathers reject unproven offsets and unsupported modes"
     }
     auto invalid = PerTapProgram();
     invalid[0].words[0] = 0x00081802; // predicated offset definition
-    REQUIRE(LowerToMaxwell(invalid).error == "native per-tap gather nonconstant offsets");
+    REQUIRE(CopiesOffsets(LowerToMaxwell(invalid), 8));
     invalid = PerTapProgram();
     invalid[1].words[0] = 0x000a7802; // R9 never defined
-    REQUIRE(LowerToMaxwell(invalid).error == "native per-tap gather missing offsets");
+    REQUIRE(CopiesOffsets(LowerToMaxwell(invalid), 8));
     // Register pairs that would reach the lowering scratch registers.
     for (const u32 word : {0xf50a7b63U, 0x04f57b63U}) {
         invalid = PerTapProgram();
@@ -138,8 +147,11 @@ TEST_CASE("Ampere per-tap gathers reject unproven offsets and unsupported modes"
     REQUIRE_FALSE(LowerToMaxwell(invalid));
     const Instruction branch{{0x00007947, 0, 0x03800000, 0}};
     const auto program = PerTapProgram();
-    REQUIRE_FALSE(LowerToMaxwell(std::array{branch, program[0], program[1], program[2], Exit}));
-    REQUIRE_FALSE(LowerToMaxwell(std::array{program[0], program[1], program[2], branch, Exit}));
+    // A branch before or after the gather stops the constant proof: the offsets are copied.
+    REQUIRE(CopiesOffsets(
+        LowerToMaxwell(std::array{branch, program[0], program[1], program[2], Exit}), 8));
+    REQUIRE(CopiesOffsets(
+        LowerToMaxwell(std::array{program[0], program[1], program[2], branch, Exit}), 8));
 }
 
 TEST_CASE("Ampere gathers without per-tap offsets keep their previous lowering",
@@ -200,13 +212,13 @@ TEST_CASE("Ampere half gathers prove literal IMAD offsets across outgoing branch
     CHECK(lowered.instructions[start + 1] == MoveImmediate(7ULL << 16, 249, 0x01010100));
     auto invalid = code;
     invalid[2].words[1] = 0;
-    CHECK(LowerToMaxwell(invalid).error == "native per-tap gather control-flow proof");
+    CHECK(CopiesOffsets(LowerToMaxwell(invalid), 0));
     invalid = code;
     invalid[0].words[0] = 0xff001424;
-    CHECK(LowerToMaxwell(invalid).error == "native per-tap gather nonconstant offsets");
+    CHECK(CopiesOffsets(LowerToMaxwell(invalid), 0));
     invalid = code;
     invalid[2].words = {0x00007805, 0, 0x0001ff00, 0};
-    CHECK(LowerToMaxwell(invalid).error == "native per-tap gather nonconstant offsets");
+    CHECK(CopiesOffsets(LowerToMaxwell(invalid), 0));
 }
 
 TEST_CASE("Ampere guarded IMAD offsets remain constant across unrelated predicates",
@@ -234,27 +246,27 @@ TEST_CASE("Ampere guarded IMAD offsets remain constant across unrelated predicat
             if (guard == 7) {
                 CHECK(LowerToMaxwell(changed));
             } else {
-                CHECK(LowerToMaxwell(changed).error == "native per-tap gather nonconstant offsets");
+                CHECK(CopiesOffsets(LowerToMaxwell(changed), 16));
             }
         }
     }
     for (const u32 instruction : {2U, 3U}) {
         auto invalid = code;
         invalid[instruction].words[2] = (invalid[instruction].words[2] & ~(7U << 17)) | (1U << 17);
-        CHECK(LowerToMaxwell(invalid).error == "native per-tap gather nonconstant offsets");
+        CHECK(CopiesOffsets(LowerToMaxwell(invalid), 16));
     }
     auto invalid = code;
     invalid[3].words[2] = (invalid[3].words[2] & ~(7U << 20)) | (1U << 20);
-    CHECK(LowerToMaxwell(invalid).error == "native per-tap gather nonconstant offsets");
+    CHECK(CopiesOffsets(LowerToMaxwell(invalid), 16));
     invalid = code;
     invalid[2].words = {0x041c7810, 4, 0x07f3e0ff, 0};
-    CHECK(LowerToMaxwell(invalid).error == "native per-tap gather nonconstant offsets");
+    CHECK(CopiesOffsets(LowerToMaxwell(invalid), 16));
     invalid = code;
     invalid[4].words[1] = 0;
-    CHECK(LowerToMaxwell(invalid).error == "native per-tap gather control-flow proof");
+    CHECK(CopiesOffsets(LowerToMaxwell(invalid), 16));
     invalid = code;
     invalid[2].words = {0x00107805, 0, 0x0001ff00, 0};
-    CHECK(LowerToMaxwell(invalid).error == "native per-tap gather nonconstant offsets");
+    CHECK(CopiesOffsets(LowerToMaxwell(invalid), 16));
 }
 
 TEST_CASE("Ampere half texture results keep the first component in the low lane",

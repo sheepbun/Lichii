@@ -296,10 +296,13 @@ TEST_CASE("Ampere gathers take arrays, per-pixel offsets and depth references",
     const auto per_pixel = lower({{0x06189b63, 0x30007c10, 0x001e2f0e, 0x000f4600}});
     INFO(per_pixel.error);
     REQUIRE(static_cast<bool>(per_pixel));
+    // Lichii puts the offsets in R248, R249 (where proven constants go) before the coordinates.
     REQUIRE(per_pixel.instructions.size() >= 5);
-    CHECK(field(per_pixel.instructions[2], 20, 8) == 16);
-    CHECK(field(per_pixel.instructions[3], 20, 8) == 17);
-    CHECK(field(per_pixel.instructions[4], 20, 8) == 246);
+    CHECK(field(per_pixel.instructions[0], 0, 8) == 248);
+    CHECK(field(per_pixel.instructions[0], 20, 8) == 16);
+    CHECK(field(per_pixel.instructions[1], 0, 8) == 249);
+    CHECK(field(per_pixel.instructions[1], 20, 8) == 17);
+    CHECK(field(per_pixel.instructions[4], 20, 8) == 248);
     CHECK(field(per_pixel.instructions[4], 28, 3) == 2);
     CHECK(field(per_pixel.instructions[4], 54, 2) == 2);
 
@@ -393,22 +396,7 @@ TEST_CASE("Ampere Ocarina byte constant loads, ULEA carries to UP3 and two-sourc
     const auto field = [](u64 word, u32 offset, u32 count) {
         return (word >> offset) & ((u64{1} << count) - 1);
     };
-    // These forms are lowered by default; EDEN_NX2_LOWER_EXTENDED=0 rejects them again.
-    const auto set_extended = [](const char* value) {
-#ifdef _WIN32
-        _putenv_s("EDEN_NX2_LOWER_EXTENDED", value ? value : "");
-#else
-        if (value) {
-            setenv("EDEN_NX2_LOWER_EXTENDED", value, 1);
-        } else {
-            unsetenv("EDEN_NX2_LOWER_EXTENDED");
-        }
-#endif
-    };
-    constexpr Instruction ByteLoad{0x06087abb, 0x01002080, 0x08000000, 0x000fe400};
-    set_extended("0");
-    CHECK_FALSE(lower({ByteLoad}));
-    set_extended(nullptr);
+    // Lichii lowers these forms unconditionally: it has no EDEN_NX2_LOWER_EXTENDED switch.
     // ULDC.U8 UR8, c[0x4][UR6+0x82]: LDC.U8 (size 0) indexed by UR6's register, odd offset kept.
     const auto byte_load = lower({{0x06087abb, 0x01002080, 0x08000000, 0x000fe400}});
     INFO(byte_load.error);
@@ -430,12 +418,16 @@ TEST_CASE("Ampere Ocarina byte constant loads, ULEA carries to UP3 and two-sourc
         return (word >> 52) == 0x38e && field(word, 0, 8) == 239 && field(word, 20, 8) == 8;
     }));
 
-    // F2IP.U8.F32.NTZ R45, R44, R21, RZ: two byte conversions, R44's shifted into byte 1.
+    // F2IP.U8.F32.NTZ R45, R44, R21, RZ: two byte conversions, R44's shifted into byte 1. Lichii
+    // packs them with one ISCADD (R44's byte << 8 + R21's) where upstream shifts and ORs.
     const auto pack = lower({{0x2c2d7243, 0x00000015, 0x000004ff, 0x000fc400}});
     INFO(pack.error);
     REQUIRE(static_cast<bool>(pack));
     CHECK(CountMaxwell(pack, 0x5cb, 52) == 2);
-    CHECK(FindMaxwell(pack, 0x384, 52) != 0);
+    const u64 packed = FindMaxwell(pack, 0x5c1, 52);
+    REQUIRE(packed != 0);
+    CHECK(field(packed, 0, 8) == 45);
+    CHECK(field(packed, 39, 5) == 8);
 
     // ULDC UR7, c[0x4][UR15+0x29]: only the indexed sum has to be aligned.
     const auto indexed = lower({{0x0f077abb, 0x01000a40, 0x08000800, 0x000fc600}});

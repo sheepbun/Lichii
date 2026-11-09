@@ -101,10 +101,21 @@ TEST_CASE("Ampere byte F2I rejects other widths, rounding, modifiers and registe
         invalid[0].words = {0x00157d05, source, 0x0821e100, 0x0001e400};
         REQUIRE_FALSE(static_cast<bool>(LowerToMaxwell(invalid)));
     }
-    for (const u32 source : {0x00400440U, 0x04800400U, 0x40400400U, 0x80400400U}) {
+    for (const u32 source : {0x00400440U, 0x04800400U}) {
         auto invalid = code;
         invalid[0].words = {0x00157b05, source, 0x0021e100, 0x0001e400};
         REQUIRE_FALSE(static_cast<bool>(LowerToMaxwell(invalid)));
+    }
+    // Bits 62 and 63 are |c[..]| and -c[..] (upstream 9b27d7eac8): applied to the loaded constant.
+    for (const u32 modifier : {1U, 2U}) {
+        auto modified = code;
+        modified[0].words = {0x00157b05, 0x00400400 | (modifier << 30), 0x0021e100, 0x0001e400};
+        const auto lowered = LowerToMaxwell(modified);
+        REQUIRE(static_cast<bool>(lowered));
+        CHECK(lowered.instructions[1] ==
+              (0x0400000000070000ULL | 252 | (252ULL << 8) |
+               (u64{modifier == 1 ? 0x7fffffffU : 0x80000000U} << 20) |
+               (u64{modifier == 1 ? 0U : 2U} << 53)));
     }
     auto missing_uniform_mode = code;
     missing_uniform_mode[0].words[0] = 0x00157d05;

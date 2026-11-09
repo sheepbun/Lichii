@@ -318,7 +318,6 @@ TEST_CASE("Star Fox ULDC U16 rejects unrepresentable offsets and unsupported mod
              std::array{38U, 16U, 0x8000U}, std::array{38U, 16U, 0xfffeU},
              std::array{16U, 8U, 63U}, std::array{16U, 8U, 64U},
              std::array{54U, 5U, 18U}, std::array{62U, 2U, 1U},
-             std::array{73U, 3U, 1U}, std::array{73U, 3U, 3U},
              std::array{73U, 3U, 6U}, std::array{78U, 2U, 2U},
              std::array{91U, 1U, 1U}}) {
         auto instruction = CapturedUniformLoad;
@@ -326,6 +325,16 @@ TEST_CASE("Star Fox ULDC U16 rejects unrepresentable offsets and unsupported mod
         const auto lowered = LowerToMaxwell(std::array{instruction, Exit});
         CHECK_FALSE(lowered);
         CHECK(lowered.instructions.empty());
+    }
+    // S8 and S16 (widths 1 and 3) are LDC.S8 and LDC.S16, which the Maxwell translator
+    // sign-extends (GetCbuf with is_signed).
+    for (const u32 width : {1U, 3U}) {
+        auto instruction = CapturedUniformLoad;
+        SetBits(instruction, 73, 3, width);
+        const auto lowered = LowerToMaxwell(std::array{instruction, Exit});
+        INFO(lowered.error);
+        REQUIRE(lowered);
+        CHECK(((lowered.instructions.front() >> 48) & 7) == width);
     }
     auto indexed = CapturedUniformLoad;
     SetBits(indexed, 0, 12, 0xabb);
@@ -335,6 +344,8 @@ TEST_CASE("Star Fox ULDC U16 rejects unrepresentable offsets and unsupported mod
     INFO(indexed_load.error);
     CHECK(indexed_load);
     SetBits(indexed, 73, 3, 1);
+    CHECK(LowerToMaxwell(std::array{indexed, Exit}));
+    SetBits(indexed, 73, 3, 6);
     CHECK_FALSE(LowerToMaxwell(std::array{indexed, Exit}));
 }
 
@@ -393,7 +404,7 @@ TEST_CASE("Star Fox uniform U16 conversion rejects invalid uniform sources and o
         CHECK_FALSE(lowered);
         CHECK(lowered.instructions.empty());
     }
-    for (const u32 mode : {0x00101000U, 0x08101400U, 0x08109000U, 0x08100800U}) {
+    for (const u32 mode : {0x00101000U, 0x08109000U, 0x08100800U}) {
         auto instruction = CapturedI2F;
         instruction.words[2] = mode;
         const auto lowered = LowerToMaxwell(std::array{instruction, Exit});
@@ -475,14 +486,22 @@ TEST_CASE("Star Fox signed register shift keeps other funnel modes rejected",
     for (const auto change : std::array{
              std::array{24U, 8U, 3U}, std::array{73U, 2U, 0U}, std::array{73U, 2U, 1U},
              std::array{76U, 1U, 0U}, std::array{80U, 1U, 0U}, std::array{72U, 1U, 1U},
-             std::array{32U, 16U, 0x125U}, std::array{0U, 12U, 0xc19U},
-             std::array{96U, 1U, 1U}}) {
+             std::array{32U, 16U, 0x125U}, std::array{96U, 1U, 1U}}) {
         auto instruction = CapturedShift;
         SetBits(instruction, change[0], change[1], change[2]);
         const auto lowered = LowerToMaxwell(std::array{instruction, Exit});
         CHECK_FALSE(lowered);
         CHECK(lowered.instructions.empty());
     }
+    // The uniform-shift form (0xc19, from upstream 587633debe) clamps UR5's mirror, R221.
+    auto uniform = CapturedShift;
+    SetBits(uniform, 0, 12, 0xc19);
+    SetBits(uniform, 32, 8, 5);
+    SetBits(uniform, 91, 1, 1);
+    const auto lowered = LowerToMaxwell(std::array{uniform, Exit});
+    INFO(lowered.error);
+    REQUIRE(lowered);
+    CHECK(((lowered.instructions.front() >> 8) & 0xff) == 221);
 }
 
 TEST_CASE("Star Fox array gather preserves layer coordinates components and split destinations",
