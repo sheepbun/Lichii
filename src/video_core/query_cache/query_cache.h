@@ -282,9 +282,28 @@ void QueryCacheBase<Traits>::CounterReport(GPUVAddr addr, QueryType counter_type
     };
     u8* pointer = impl->device_memory.template GetPointer<u8>(cpu_addr);
     u8* pointer_timestamp = impl->device_memory.template GetPointer<u8>(cpu_addr + 8);
+    // A payload release written once a host fence passes: acquires behind it in command order
+    // may proceed before then (Nx2SemaphoreWaiters).
+    const bool queued_release =
+        counter_type == QueryType::Payload && (is_fence || Settings::IsGPULevelHigh());
+    if (queued_release) {
+        Tegra::Nx2SemaphoreWaiters::Get().OnQueued(cpu_addr, payload);
+    }
     std::function<void()> operation([this, streamer, query_base = query, query_location,
                                      pointer, pointer_timestamp, cpu_addr, addr,
-                                     asid = gpu_memory->GetID(), counter_type] {
+                                     asid = gpu_memory->GetID(), counter_type, queued_release,
+                                     payload] {
+        // Retired once the memory holds the value (or the write is dropped), on every return.
+        struct Retire {
+            bool queued;
+            DAddr address;
+            u32 value;
+            ~Retire() {
+                if (queued) {
+                    Tegra::Nx2SemaphoreWaiters::Get().OnRetired(address, value);
+                }
+            }
+        } const retire{queued_release, cpu_addr, payload};
         if (True(query_base->flags & QueryFlagBits::IsInvalidated)) {
             if (const u64 trace = QueryTrace::Sample(QueryTrace::Event::Discard)) {
                 LOG_INFO(HW_GPU,
