@@ -353,3 +353,57 @@ corrupts frames unless the GPU thread snapshots the data it reads late. The
 remaining measured levers, each at most a few percent: CPU-read downloads
 (about 1 ms per frame), the 50 µs suspended-channel poll, rasterizer lock
 contention from CPU writes, and the back's flat per-draw cost.
+
+## P5-01: frame generation held up the GPU thread (retained)
+
+With frame generation at a 170 FPS target, Hyrule Field ran at 28.3 game FPS against
+33.2 without it (fixed view, `P5_fg_*`). `Composite` (GPU thread) took a presentation frame
+per generated frame and waited when FIFO had not shown the previous batch yet, so the game
+waited too, and the pacer then planned more generations for the longer interval.
+`cf0038e749` generates only into frames free at that moment and has the present thread drop a
+generated frame once a later batch is queued (that batch's game frame is still shown).
+A/B/B/A at 170 Hz: panning 25.2/24.7 -> 26.8/27.3 game FPS (27.4-27.6 in three repeats),
+shown rate unchanged at ~166, 98-99% single-vblank. With the window on a 60 Hz monitor the
+old build fell to 21.9-29.5 while the new one held 32.7-35.0.
+
+## P5-02: what the rest of frame generation's cost is (host setup, not fixed here)
+
+FG on still costs ~15% of game FPS (`P5_z*`, `P5_st*`): the GPU threads retire the same
+instructions per frame but need ~12% more cycles (IPC 1.28 -> 1.15 on GPUBack, LLC misses
++9%) at the same 4.37 GHz, and wait ~5 ms longer per frame. Composite CPU time is 0.35 ms,
+the SMT siblings of the pinned GPU cores are 67-78% idle, and a separate present queue (blits
+off the graphics queue) changed nothing (rejected). Cause: mutter's primary GPU is the Intel
+iGPU (a 60 Hz monitor on its HDMI port), so every frame for the NVIDIA-attached 170 Hz DP-3
+monitor crosses system memory. With FG on, gnome-shell's i915 render engine goes from ~19%
+to ~69% busy, iGPU DRAM traffic from 0.6 to 2.7 GB/s and PCIe I/O from 1.0 to 4.1 GB/s
+(`uncore_imc`), contending with the CPU for L3 and DRAM. Making the NVIDIA card mutter's
+preferred primary GPU (udev tag `mutter-device-preferred-primary`, then a new session)
+should remove the copies; not applied, it is a desktop-wide change for the owner.
+
+## P5-03: rejected or neutral
+
+- Guest idle spin (`EDEN_NX2_IDLE_SPIN_US` 0/30/100/300): within run-to-run noise.
+- `YUZU_BUILD_PRESET=native` (Rocket Lake, AVX-512 available): 32.8/32.0 vs 33.0/32.5 still,
+  30.4/31.5 vs 31.7/31.1 pan. No gain.
+
+## P5-04: profile-guided and link-time optimized build (retained for the local package)
+
+The GPU threads are not limited by instruction selection: about half of GPUBack's uops
+come from the legacy decoder rather than the uop cache, and its ~3.4 M L3 misses/s are
+spread over the whole draw path (pipeline and image view lookups, page table walks, buffer
+bindings, a few percent each). GCC PGO trained on one rig session (boot, newest save, four
+pan/walk cycles, FG on; `-fprofile-update=prefer-atomic`, use with
+`-fprofile-partial-training`), then LTO on top:
+
+| A/B/B/A (FG off) | Still FPS | Pan FPS |
+|---|---|---|
+| current vs PGO | 31.2/31.5 vs 32.3/33.0 | 30.0/30.1 vs 31.3/31.4 |
+| PGO vs PGO+LTO | 34.7/34.2 vs 35.6/36.6 | 32.8/33.0 vs 33.2/33.4 |
+
+About +8% still and +5% panning over the plain Release build; pan p99 also improved. Logs
+show the same errors and warnings as the plain build, no device loss. The tree's
+`-Werror=all` trips on PGO-only maybe-uninitialized warnings, so the use build appends `-w`
+through a compiler launcher; LTO reports a pre-existing Boost.System ODR mismatch
+(error-category vtables) that the normal link also resolves arbitrarily. Installed as
+`lichii-custom 125.r3` from `.cache/build-pgo`; recipe in `.cache/P5/` (`train.sh`) and
+`.cache/pkg/PKGBUILD`. Profiles go stale as code changes: retrain after rebasing.
