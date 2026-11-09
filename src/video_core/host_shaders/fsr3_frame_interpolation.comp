@@ -18,6 +18,13 @@ layout(push_constant) uniform PushConstants {
 // textureGather fetches a 2├ù2 quad per call, so we only need 4 calls
 // to cover a 3├ù3 neighbourhood (vs 9 individual texture() calls).
 // We extract the median of X and Y components independently.
+// Mean absolute RGB difference under which a pixel counts as unchanged between the frames.
+const float STATIC_THRESHOLD = 0.012;
+
+float ColorDistance(vec4 a, vec4 b) {
+    return dot(abs(a.rgb - b.rgb), vec3(1.0 / 3.0));
+}
+
 void insertionSort5(inout float a[5]) {
     for (int i = 1; i < 5; i++) {
         float key = a[i];
@@ -81,9 +88,20 @@ void main() {
     // Median-filtered motion vector (reduces outlier jitter)
     vec2 motion = sampleMotionMedian(uv) / vec2(textureSize(MotionVectors, 0));
 
+    // Pixels that did not change are static (the HUD, or what the camera follows): keep them in
+    // place instead of warping them with the motion around them.
+    const vec4 previous_here = texture(PreviousFrame, uv);
+    const vec4 current_here = texture(CurrentFrame, uv);
+    if (ColorDistance(previous_here, current_here) < STATIC_THRESHOLD) {
+        imageStore(OutGeneratedFrame, pixel_coord, mix(previous_here, current_here, blend_factor));
+        return;
+    }
+
     // Forward and backward warped coordinates
-    vec2 forward_uv  = clamp(uv + motion * blend_factor,         0.0, 1.0);
-    vec2 backward_uv = clamp(uv - motion * (1.0 - blend_factor), 0.0, 1.0);
+    const vec2 forward_unclamped = uv + motion * blend_factor;
+    const vec2 backward_unclamped = uv - motion * (1.0 - blend_factor);
+    vec2 forward_uv  = clamp(forward_unclamped,  0.0, 1.0);
+    vec2 backward_uv = clamp(backward_unclamped, 0.0, 1.0);
 
     vec4 forward_color  = texture(PreviousFrame, forward_uv);
     vec4 backward_color = texture(CurrentFrame,  backward_uv);
@@ -94,12 +112,31 @@ void main() {
 
     // Smooth bilateral interpolation ΓÇö bias toward centre on occlusion
     float alpha = mix(blend_factor, 0.5, occlusion * 0.4);
+
+    // A sample is unusable when it lies off screen (content entering or leaving exists in one
+    // frame only) or, for a moving pixel, on static content: that is the HUD or a character the
+    // camera follows, seen through the motion. Use the other frame's sample instead.
+    float motion_magnitude = length(motion * render_size);
+    bool forward_valid = forward_unclamped == forward_uv;
+    bool backward_valid = backward_unclamped == backward_uv;
+    if (motion_magnitude > 1.0) {
+        forward_valid = forward_valid &&
+                        ColorDistance(forward_color, texture(CurrentFrame, forward_uv)) >=
+                            STATIC_THRESHOLD;
+        backward_valid = backward_valid &&
+                         ColorDistance(texture(PreviousFrame, backward_uv), backward_color) >=
+                             STATIC_THRESHOLD;
+    }
+    if (forward_valid && !backward_valid) {
+        alpha = 0.0;
+    } else if (backward_valid && !forward_valid) {
+        alpha = 1.0;
+    }
     vec4 interpolated = mix(forward_color, backward_color, alpha);
 
     // ΓöÇΓöÇ Anti-flicker: blend with un-warped centre pixel ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-    float motion_magnitude = length(motion * render_size);
     float direct_weight = exp(-motion_magnitude * 0.5);
-    vec4 center_color = mix(texture(PreviousFrame, uv), texture(CurrentFrame, uv), blend_factor);
+    vec4 center_color = mix(previous_here, current_here, blend_factor);
     interpolated = mix(interpolated, center_color, direct_weight * 0.3);
 
     imageStore(OutGeneratedFrame, pixel_coord, interpolated);
