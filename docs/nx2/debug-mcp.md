@@ -178,8 +178,13 @@ would reset the Qt status bar's counters. `g_nx2_present_count` counts Switch 2 
 **`frame_times`** `{seconds?, refresh_hz?}` waits for `seconds` (default 5, > 0, at most 60),
 interruptible on shutdown like `status`. It measures intervals between guest presents inside
 that window, not display scanout or GPU execution time. `frames` counts those intervals;
-`mean_ms`, `fps` (1000 / mean), `p50_ms`, `p90_ms`, `p99_ms`, `min_ms`, `max_ms` describe them.
-Percentiles interpolate between sorted samples. `vsync_buckets` gives fractions (0 to 1) under
+`mean_ms`, `fps` (1000 / mean), `p50_ms`, `p90_ms`, `p99_ms`, `p999_ms`, `min_ms`, `max_ms`
+describe them. Percentiles interpolate between sorted samples. `low_1pct_fps` and
+`low_0_1pct_fps` are 1000 divided by the mean of the slowest 1% and 0.1% of intervals,
+respectively (sample counts rounded up). `stddev_ms` is the population standard deviation.
+These statistics use all available intervals in the window, including spikes outside the
+120-sample recent tail. Short windows give very few samples for the lows; check `frames`.
+`vsync_buckets` gives fractions (0 to 1) under
 keys `1`, `2`, `3`, `4+`, using boundaries 1.5, 2.5 and 3.5 refresh intervals (`refresh_hz`
 defaults to 60 and must be positive). `stutters` counts intervals strictly above twice the
 median. `intervals_ms` contains the last up to 120 intervals in chronological order, rounded

@@ -314,9 +314,20 @@ json ReadFrameTimes(u64 before, u64 after, u64 begin_ns, u64 end_ns, double refr
     const double mean = frames == 0 ? 0.0 : std::accumulate(intervals.begin(), intervals.end(), 0.0) /
                                               static_cast<double>(frames);
     const double median = percentile(0.5);
+    // Lows are the reciprocal of the mean of the slowest ceil(N / divisor) intervals.
+    const auto low_fps = [&](size_t divisor) {
+        const size_t count = (frames + divisor - 1) / divisor;
+        if (count == 0) {
+            return 0.0;
+        }
+        const double total = std::accumulate(intervals.end() - count, intervals.end(), 0.0);
+        return total > 0.0 ? 1000.0 * static_cast<double>(count) / total : 0.0;
+    };
+    double squared_deviations = 0.0;
     std::array<size_t, 4> buckets{};
     size_t stutters = 0;
     for (const double interval : intervals) {
+        squared_deviations += (interval - mean) * (interval - mean);
         const double periods = interval * refresh_hz / 1000.0;
         ++buckets[periods < 1.5 ? 0 : periods < 2.5 ? 1 : periods < 3.5 ? 2 : 3];
         stutters += interval > 2.0 * median;
@@ -330,6 +341,10 @@ json ReadFrameTimes(u64 before, u64 after, u64 begin_ns, u64 end_ns, double refr
             {"p50_ms", median},
             {"p90_ms", percentile(0.9)},
             {"p99_ms", percentile(0.99)},
+            {"p999_ms", percentile(0.999)},
+            {"low_1pct_fps", low_fps(100)},
+            {"low_0_1pct_fps", low_fps(1000)},
+            {"stddev_ms", frames == 0 ? 0.0 : std::sqrt(squared_deviations / frames)},
             {"max_ms", frames == 0 ? 0.0 : intervals.back()},
             {"min_ms", frames == 0 ? 0.0 : intervals.front()},
             {"vsync_buckets", {{"1", share(0)}, {"2", share(1)}, {"3", share(2)}, {"4+", share(3)}}},
