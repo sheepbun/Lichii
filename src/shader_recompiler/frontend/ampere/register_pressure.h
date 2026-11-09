@@ -127,9 +127,14 @@ inline RegisterPressure PrepareRegisterPressure(const Instruction& input, u32 re
         operand(16);
         operand(24);
         break;
+    case 0x243: // F2IP: Rd, Ra, Rb and the high half Rc
+        operand(16);
+        operand(24);
+        operand(32);
+        operand(64);
+        break;
     case 0x308:
     case 0x202:
-    case 0x243:
     case 0x245:
     case 0x305:
     case 0x306:

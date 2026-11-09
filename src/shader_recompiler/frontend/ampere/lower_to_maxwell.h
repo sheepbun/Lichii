@@ -2121,12 +2121,13 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
         }
 
         case 0x243:
-            // F2IP.U8.F32 Rd, Ra, Rb, RZ: Rb's byte in bits 0-7 and Ra's in bits 8-15. The default
-            // rounding (bits 78-79 clear) packs unorm values already scaled by 255.
-            if ((insn.words[1] & ~0xffU) ||
-                (insn.words[2] != 0x0000c4ffU && insn.words[2] != 0x000004ffU))
+            // F2IP.U8.F32 Rd, Ra, Rb, Rc: Rb's byte in bits 0-7, Ra's in bits 8-15 and Rc's high
+            // half above them. The default rounding (bits 78-79 clear) packs unorm values already
+            // scaled by 255. Rc and the other roundings are from upstream 9a69d8eaf0.
+            if ((insn.words[1] & ~0xffU) || (insn.words[2] & ~0xc0ffU) != 0x400U)
                 return fail(index, "native packed float-to-byte mode");
-            if (insn.Bits(24, 8) != 255 || insn.words[2] == 0x000004ffU) {
+            if (insn.Bits(24, 8) != 255 || insn.words[2] != 0x0000c4ffU) {
+                const u32 high_half = insn.Bits(64, 8);
                 const auto to_byte = [&](u32 source, u32 target) {
                     emit(0x5800000000000000ULL | predicate | target | (u64{source} << 8) |
                          (u64{source} << 20) | (u64{7} << 39) | (u64{7} << 48));
@@ -2142,12 +2143,25 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
                          (u64{target} << 20) | (u64{insn.Bits(78, 2)} << 39));
                 };
                 to_byte(insn.Bits(32, 8), 250);
-                if (insn.Bits(24, 8) == 255) {
+                if (insn.Bits(24, 8) == 255 && high_half == 255) {
                     emit(base(0x5c98000000000000ULL) | (u64{15} << 39) | (u64{250} << 20));
                     break;
                 }
-                to_byte(insn.Bits(24, 8), 251);
-                emit(base(0x5c18000000000000ULL) | (u64{251} << 8) | (u64{250} << 20) | (u64{8} << 39));
+                if (insn.Bits(24, 8) != 255) {
+                    to_byte(insn.Bits(24, 8), 251);
+                    if (high_half == 255) {
+                        emit(base(0x5c18000000000000ULL) | (u64{251} << 8) | (u64{250} << 20) |
+                             (u64{8} << 39));
+                        break;
+                    }
+                    emit(0x5c18000000000000ULL | predicate | 250 | (u64{251} << 8) |
+                         (u64{250} << 20) | (u64{8} << 39));
+                }
+                mov_imm(252, 0xffff0000U);
+                emit(0x5c40000000000000ULL | predicate | 251 | (u64{high_half} << 8) |
+                     (u64{252} << 20) | (u64{7} << 48));
+                emit(base(0x5c40000000000000ULL) | (u64{250} << 8) | (u64{251} << 20) |
+                     (u64{1} << 41) | (u64{7} << 48));
                 break;
             }
             insn.words[0] &= 0x00ffffffU;
