@@ -2329,7 +2329,10 @@ private:
                 m_last_capture = std::make_shared<std::vector<u8>>();
             }
         }
-        if (path.empty() || m_capture_pending->exchange(true)) {
+        // Another screenshot (the debug server's) in flight would make the renderer drop this
+        // request, and its callback, which clears m_capture_pending, would never run.
+        if (path.empty() || system.GPU().Renderer().IsScreenshotPending() ||
+            m_capture_pending->exchange(true)) {
             return;
         }
         const auto layout = Layout::DefaultFrameLayout(1280, 720);
