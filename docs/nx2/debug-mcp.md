@@ -194,6 +194,11 @@ For example: `{"method":"frame_times","params":{"seconds":5,"refresh_hz":60}}`. 
 `"lookback": true` it returns at once with the presents of the last `seconds` from the ring. The
 server answers one request at a time, so this measures the frames of an `input_sequence` call that
 just returned.
+`"source": "host"` measures the emulator's swapchain presents instead (`vkQueuePresentKHR` calls,
+frame generation's frames included), recorded while the server runs. Present calls are not scanout:
+FIFO queues a burst and shows it one refresh apart, so the host result adds `fifo_display`, the
+same statistics for the times FIFO would show those presents at `refresh_hz` (each present no
+sooner than one refresh after the previous one).
 
 **`screenshot`** `{height?, save?, timeout_s?}`. It requests a 16:9 layout from
 `Layout::DefaultFrameLayout`, and the renderer blits the presented framebuffers into it. The BGRA

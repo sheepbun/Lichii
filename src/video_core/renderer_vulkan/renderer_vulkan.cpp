@@ -249,11 +249,18 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                       GuestExtent(framebuffers));
 
     const size_t generated_frames = frame_gen.GeneratedFrameCount();
+    const std::chrono::nanoseconds spacing = frame_gen.OutputSpacing();
+    frame->batch_start = generated_frames == 0;
+    frame->real = true;
+    frame->present_offset = spacing * generated_frames;
     for (size_t generation = 0; generation < generated_frames; ++generation) {
         Frame* generated = present_manager.GetRenderFrame();
+        generated->batch_start = generation == 0;
+        generated->real = false;
+        generated->present_offset = spacing * generation;
         blit_swapchain.PrepareFrame(device, generated, render_window.GetFramebufferLayout());
         frame_gen.GenerateInto(device, generated, generation);
-        scheduler.Flush(*generated->render_ready);
+        frame_gen.Submit(generated, generation);
         present_manager.Present(generated);
     }
 #endif
@@ -261,7 +268,11 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     if (trace) {
         scheduler.MarkFrameEnd(++trace_frame);
     }
+#ifdef HAS_LSFG
+    frame_gen.Submit(frame, generated_frames);
+#else
     scheduler.Flush(*frame->render_ready);
+#endif
 
     const auto presenting = trace ? std::chrono::steady_clock::now()
                                   : std::chrono::steady_clock::time_point{};

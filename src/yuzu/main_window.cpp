@@ -5163,7 +5163,7 @@ void MainWindow::UpdateFrameGenButton() {
     const QString target = target_rate == 0
                                ? QString()
                                : tr(" It adds up to %1 frames per game frame to reach %2 FPS.")
-                                     .arg(Settings::MAX_FRAME_GEN_MULTIPLIER - 1)
+                                     .arg(Settings::FrameGenMaxGenerations())
                                      .arg(target_rate);
 
     if (!emulation_running) {

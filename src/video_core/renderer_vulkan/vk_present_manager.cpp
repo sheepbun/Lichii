@@ -4,8 +4,13 @@
 // SPDX-FileCopyrightText: Copyright 2023 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <chrono>
+
+#include "common/dkb_frame_trace.h"
+#include "common/logging.h"
 #include "common/settings.h"
 #include "common/thread.h"
+#include "core/core.h"
 #include "core/frontend/emu_window.h"
 #ifdef HAS_LSFG
 #include "video_core/renderer_vulkan/present/lsfg_common.h"
@@ -183,13 +188,22 @@ Frame* PresentManager::GetRenderFrame() {
     frame->present_done.Wait();
     frame->present_done.Reset();
 
+    frame->batch_start = true;
+    frame->present_offset = {};
+    frame->real = true;
     return frame;
 }
 
 void PresentManager::Present(Frame* frame) {
     if (use_present_thread) {
         scheduler.Record([this, frame](vk::CommandBuffer) {
+            if (Common::DkbFrameTrace::Enabled()) {
+                frame->queued = std::chrono::steady_clock::now();
+            }
             std::unique_lock lock{queue_mutex};
+            if (frame->batch_start) {
+                queued_batches.fetch_add(1, std::memory_order_relaxed);
+            }
             present_queue.push_back(frame);
             frame_cv.notify_one();
         });
@@ -345,6 +359,15 @@ void PresentManager::PresentThread(std::stop_token token) {
             // before the queue lock goes out of scope. This way the swapchain
             // lock in WaitPresent is guaranteed to occur after here.
             void(std::exchange(lock, std::unique_lock{swapchain_mutex}));
+            const bool trace = Common::DkbFrameTrace::Enabled();
+            const auto hold_start = trace ? std::chrono::steady_clock::now()
+                                          : std::chrono::steady_clock::time_point{};
+            HoldForBatch(frame, token);
+            if (trace) {
+                present_trace.hold_ms += std::chrono::duration<double, std::milli>(
+                                             std::chrono::steady_clock::now() - hold_start)
+                                             .count();
+            }
             CopyToSwapchain(frame);
 
             // Free the frame for reuse
@@ -352,6 +375,26 @@ void PresentManager::PresentThread(std::stop_token token) {
             free_queue.push_back(frame);
             free_cv.notify_one();
         }
+    }
+}
+
+void PresentManager::HoldForBatch(Frame* frame, std::stop_token token) {
+    const auto now = std::chrono::steady_clock::now();
+    if (frame->batch_start) {
+        queued_batches.fetch_sub(1, std::memory_order_relaxed);
+        batch_anchor = now;
+        return;
+    }
+    // A later batch already waiting means this one is behind: show the rest at once.
+    if (queued_batches.load(std::memory_order_relaxed) != 0) {
+        return;
+    }
+    constexpr auto MAX_HOLD = std::chrono::milliseconds{100};
+    const auto target = (std::min)(batch_anchor + frame->present_offset, now + MAX_HOLD);
+    while (!token.stop_requested() && std::chrono::steady_clock::now() < target &&
+           queued_batches.load(std::memory_order_relaxed) == 0) {
+        std::this_thread::sleep_until(
+            (std::min)(target, std::chrono::steady_clock::now() + std::chrono::milliseconds{1}));
     }
 }
 
@@ -440,9 +483,14 @@ void PresentManager::CopyToSwapchainImpl(Frame* frame) {
         return;
     }
 
+    const bool trace = Common::DkbFrameTrace::Enabled();
+    const auto acquire_start = trace ? std::chrono::steady_clock::now()
+                                     : std::chrono::steady_clock::time_point{};
     while (swapchain.AcquireNextImage(!use_present_thread)) {
         RecreateSwapchain(frame);
     }
+    const auto acquired = trace ? std::chrono::steady_clock::now()
+                                : std::chrono::steady_clock::time_point{};
 
     const vk::CommandBuffer cmdbuf{frame->cmdbuf};
     cmdbuf.Begin({
@@ -589,6 +637,46 @@ void PresentManager::CopyToSwapchainImpl(Frame* frame) {
 
     // Present
     swapchain.Present(render_semaphore);
+    if (trace) {
+        const auto now = std::chrono::steady_clock::now();
+        const auto ms = [](auto duration) {
+            return std::chrono::duration<double, std::milli>(duration).count();
+        };
+        PresentTrace& t = present_trace;
+        ++t.presents;
+        t.acquire_ms += ms(acquired - acquire_start);
+        t.acquire_max_ms = (std::max)(t.acquire_max_ms, ms(acquired - acquire_start));
+        t.submit_present_ms += ms(now - acquired);
+        if (frame->real) {
+            // From the worker queueing the game's frame to its present call: the delay frame
+            // generation adds before it is shown (FIFO's queue comes on top).
+            ++t.real_presents;
+            t.real_delay_ms += ms(now - frame->queued);
+            t.real_delay_max_ms = (std::max)(t.real_delay_max_ms, ms(now - frame->queued));
+        }
+        if (now >= t.next) {
+            if (t.next != std::chrono::steady_clock::time_point{}) {
+                LOG_INFO(Render_Vulkan,
+                         "DKB present_thread presents={} hold_ms={:.1f} acquire_ms={:.1f} "
+                         "acquire_max_ms={:.2f} submit_present_ms={:.1f} real_presents={} "
+                         "real_delay_avg_ms={:.1f} real_delay_max_ms={:.1f}",
+                         t.presents, t.hold_ms, t.acquire_ms, t.acquire_max_ms,
+                         t.submit_present_ms, t.real_presents,
+                         t.real_presents ? t.real_delay_ms / t.real_presents : 0.0,
+                         t.real_delay_max_ms);
+            }
+            t = PresentTrace{.next = now + std::chrono::seconds{1}};
+        }
+    }
+    if (Core::g_nx2_present_time_services.load(std::memory_order_relaxed) != 0) {
+        const u64 present =
+            Core::g_nx2_host_present_count.fetch_add(1, std::memory_order_relaxed) + 1;
+        const u64 present_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   std::chrono::steady_clock::now().time_since_epoch())
+                                   .count();
+        Core::g_nx2_host_present_times_ns[present % Core::g_nx2_host_present_times_ns.size()]
+            .store(present_ns, std::memory_order_relaxed);
+    }
 }
 
 } // namespace Vulkan

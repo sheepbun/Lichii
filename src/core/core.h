@@ -123,6 +123,10 @@ extern std::atomic<u64> g_nx2_present_count;
 /// server runs (g_nx2_present_time_services: debug services alive), for its frame_times tool.
 extern std::array<std::atomic<u64>, 4096> g_nx2_present_times_ns;
 extern std::atomic<u32> g_nx2_present_time_services;
+/// Host swapchain presents (vkQueuePresentKHR calls, generated frames included) and their
+/// steady-clock times, kept like the guest ring above for frame_times {"source": "host"}.
+extern std::atomic<u64> g_nx2_host_present_count;
+extern std::array<std::atomic<u64>, 4096> g_nx2_host_present_times_ns;
 
 class CpuManager;
 class Debugger;
