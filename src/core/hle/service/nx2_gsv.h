@@ -82,6 +82,7 @@
 #include "core/hle/service/sm/sm.h"
 #include "core/hle/service/server_manager.h"
 #include "core/hle/service/service.h"
+#include "video_core/nx2_late_read.h"
 
 namespace Service {
 
@@ -1837,7 +1838,10 @@ private:
         // ahead, where it rewrote memory the GPU thread hadn't read yet (misread commands, then
         // a freeze or crash; rubberbanding while moving). Title 1 runs ahead without either.
         // Ocarina of Time a frame ahead rewrote data the GPU thread still read for this frame, and
-        // the frame rendered with the next one's (one-frame white or overexposed flashes).
+        // the frame rendered with the next one's (one-frame white or overexposed flashes). Not one
+        // buffer: in Hyrule Field EDEN_NX2_LATE_READ_CHECK finds ~700 pages per 2 s read after the
+        // game changed them, by buffer uploads, CPU writes inlined into GPU-owned buffers, uniform
+        // binds and macro DMA reads.
         constexpr u64 DonkeyKongBananzaProgramId = 0x040074A01BF12000ULL;
         constexpr u64 OcarinaOfTimeProgramId = 0x0400486024DEC000ULL;
         int frames_ahead = frames_ahead_setting;
@@ -1915,9 +1919,15 @@ private:
             m_stats.pace_us += to_us(paced - composited);
             m_stats.max_fence_us = (std::max<long long>)(m_stats.max_fence_us, static_cast<long long>(to_us(waited - entered)));
             // Counted at the reply: the game gets its buffers back with this frame unfinished.
-            if (const u32 fence_id = ~w[22]; fence_id < 192 &&
-                !system.Host1x().GetSyncpointManager().IsReadyGuest(fence_id, w[24])) {
-                ++m_stats.ran_ahead;
+            const u32 fence_id = ~w[22];
+            const bool ran_ahead =
+                fence_id < 192 &&
+                !system.Host1x().GetSyncpointManager().IsReadyGuest(fence_id, w[24]);
+            m_stats.ran_ahead += ran_ahead ? 1 : 0;
+            if (VideoCommon::Nx2LateRead::Enabled()) {
+                VideoCommon::Nx2LateRead::OnPresent(system.Host1x().MemoryManager(),
+                                                    system.Host1x().GetSyncpointManager(),
+                                                    ran_ahead, fence_id, w[24]);
             }
             if (m_stats.last_present != std::chrono::steady_clock::time_point{}) {
                 const long long frame = to_us(entered - m_stats.last_present);

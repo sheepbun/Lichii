@@ -28,6 +28,7 @@
 #include "video_core/memory_manager.h"
 #include "video_core/nx2.h"
 #include "video_core/nx2_cmdpage_diag.h"
+#include "video_core/nx2_late_read.h"
 #include "video_core/rasterizer_interface.h"
 
 namespace Tegra {
@@ -121,6 +122,9 @@ bool DmaPusher::Step() {
     }
 
     CommandList& command_list = dma_pushbuffer.front();
+    if (VideoCommon::Nx2LateRead::Enabled()) {
+        VideoCommon::Nx2LateRead::SetListEpoch(command_list.late_read_epoch);
+    }
 
     const size_t prefetch_size = command_list.prefetch_command_list.size();
     const size_t command_list_size = command_list.command_lists.size();

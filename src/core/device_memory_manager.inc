@@ -29,6 +29,17 @@
 #include "core/memory.h"
 #include "video_core/nx2_perf.h"
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#define EDEN_DEVICE_RETURN_ADDRESS() _ReturnAddress()
+#else
+#define EDEN_DEVICE_RETURN_ADDRESS() __builtin_return_address(0)
+#endif
+#define EDEN_DEVICE_ACCESS_HOOK(address, size, file, line, write)                                  \
+    if (const auto hook = g_device_access_hook.load(std::memory_order_relaxed)) {                  \
+        hook(address, size, file, line, EDEN_DEVICE_RETURN_ADDRESS(), write);                      \
+    }
+
 namespace Core {
 
 namespace {
@@ -389,6 +400,7 @@ void DeviceMemoryManager<Traits>::TrackContinuityImpl(DAddr address, VAddr virtu
 }
 template <typename Traits>
 u8* DeviceMemoryManager<Traits>::GetSpan(const DAddr src_addr, const std::size_t size) {
+    EDEN_DEVICE_ACCESS_HOOK(src_addr, size, nullptr, 0, false)
     size_t page_index = src_addr >> page_bits;
     size_t subbits = src_addr & page_mask;
     if ((static_cast<size_t>(tracked_entries[page_index].continuity_tracker+1) << page_bits) >= size + subbits) {
@@ -399,6 +411,7 @@ u8* DeviceMemoryManager<Traits>::GetSpan(const DAddr src_addr, const std::size_t
 
 template <typename Traits>
 const u8* DeviceMemoryManager<Traits>::GetSpan(const DAddr src_addr, const std::size_t size) const {
+    EDEN_DEVICE_ACCESS_HOOK(src_addr, size, nullptr, 0, false)
     size_t page_index = src_addr >> page_bits;
     size_t subbits = src_addr & page_mask;
     if ((static_cast<size_t>(tracked_entries[page_index].continuity_tracker+1) << page_bits) >= size + subbits) {
@@ -424,6 +437,7 @@ void DeviceMemoryManager<Traits>::InnerGatherDeviceAddresses(Common::ScratchBuff
 template <typename Traits>
 template <typename T>
 T* DeviceMemoryManager<Traits>::GetPointer(DAddr address) {
+    EDEN_DEVICE_ACCESS_HOOK(address, 1, nullptr, 0, false)
     const size_t index = address >> Memory::YUZU_PAGEBITS;
     const size_t offset = address & Memory::YUZU_PAGEMASK;
     auto phys_addr = tracked_entries[index].compressed_physical_ptr;
@@ -435,6 +449,7 @@ T* DeviceMemoryManager<Traits>::GetPointer(DAddr address) {
 template <typename Traits>
 template <typename T>
 const T* DeviceMemoryManager<Traits>::GetPointer(DAddr address) const {
+    EDEN_DEVICE_ACCESS_HOOK(address, 1, nullptr, 0, false)
     const size_t index = address >> Memory::YUZU_PAGEBITS;
     const size_t offset = address & Memory::YUZU_PAGEMASK;
     auto phys_addr = tracked_entries[index].compressed_physical_ptr;
@@ -491,6 +506,7 @@ void DeviceMemoryManager<Traits>::WalkBlock(DAddr addr, std::size_t size, auto o
 template <typename Traits>
 void DeviceMemoryManager<Traits>::ReadBlock(DAddr address, void* dest_pointer, size_t size,
                                             std::source_location caller) {
+    EDEN_DEVICE_ACCESS_HOOK(address, size, caller.file_name(), caller.line(), false)
     device_inter->FlushRegion(address, size);
     const std::size_t page_offset = address & Memory::YUZU_PAGEMASK;
     if (size <= Memory::YUZU_PAGESIZE - page_offset) {
@@ -554,12 +570,14 @@ void DeviceMemoryManager<Traits>::WriteBlock(DAddr address, const void* src_poin
         [&](const std::size_t copy_amount) {
             src_pointer = static_cast<const u8*>(src_pointer) + copy_amount;
         });
+    EDEN_DEVICE_ACCESS_HOOK(address, size, nullptr, 0, true)
     device_inter->InvalidateRegion(address, size);
 }
 
 template <typename Traits>
 void DeviceMemoryManager<Traits>::ReadBlockUnsafe(DAddr address, void* dest_pointer, size_t size,
                                                   std::source_location caller) {
+    EDEN_DEVICE_ACCESS_HOOK(address, size, caller.file_name(), caller.line(), false)
     const std::size_t page_offset = address & Memory::YUZU_PAGEMASK;
     if (size <= Memory::YUZU_PAGESIZE - page_offset) {
         const DAddr guest_page = address & ~static_cast<DAddr>(Memory::YUZU_PAGEMASK);
@@ -623,6 +641,7 @@ void DeviceMemoryManager<Traits>::WriteBlockUnsafe(DAddr address, const void* sr
         [&](const std::size_t copy_amount) {
             src_pointer = static_cast<const u8*>(src_pointer) + copy_amount;
         });
+    EDEN_DEVICE_ACCESS_HOOK(address, size, nullptr, 0, true)
 }
 
 template <typename Traits>
