@@ -99,7 +99,7 @@ TEST_CASE("Debug frame times measure intervals and retain the ring tail", "[core
         }
     };
     const auto read = [](u64 after, u64 end_ns) {
-        return Core::Nx2Debug::ReadFrameTimes(0, after, 1, end_ns, 60.0);
+        return Core::Nx2Debug::ReadFrameTimes(ring, 0, after, 1, end_ns, 60.0);
     };
     REQUIRE(read(0, 1)["frames"] == 0);
     ring[1] = 1;
@@ -135,6 +135,28 @@ TEST_CASE("Debug frame times measure intervals and retain the ring tail", "[core
     const auto pending = read(5000, 5'000'000'000);
     REQUIRE(pending["frames"] == ring.size() - 2);
     REQUIRE(pending["max_ms"] == 1.0);
+}
+
+TEST_CASE("Debug frame times model FIFO display of host presents", "[core][nx2_debug_server]") {
+    auto& ring = Core::g_nx2_host_present_times_ns;
+    SCOPE_EXIT {
+        for (auto& timestamp : ring) {
+            timestamp.store(0);
+        }
+    };
+    // A burst of three presents, then one late: at 100 Hz FIFO shows the burst 10 ms apart.
+    ring[1] = 1'000'000;
+    ring[2] = 2'000'000;
+    ring[3] = 3'000'000;
+    ring[4] = 50'000'000;
+    const auto times = Core::Nx2Debug::ReadFrameTimes(ring, 0, 4, 1, 50'000'000, 100.0, true);
+    REQUIRE(times["intervals_ms"] == json::array({1.0, 1.0, 47.0}));
+    REQUIRE(times["fifo_display"]["intervals_ms"] == json::array({10.0, 10.0, 29.0}));
+    REQUIRE(times["fifo_display"]["vsync_buckets"]["1"] == 2.0 / 3.0);
+    // A gap restarts the model instead of spanning it.
+    ring[2] = 0;
+    const auto gap = Core::Nx2Debug::ReadFrameTimes(ring, 0, 4, 1, 50'000'000, 100.0, true);
+    REQUIRE(gap["fifo_display"]["intervals_ms"] == json::array({47.0}));
 }
 
 TEST_CASE("Debug server requests map to handlers", "[core][nx2_debug_server]") {

@@ -241,19 +241,28 @@ json FrameTimes(ToolState& state, const json& params) {
         !std::isfinite(refresh_hz) || refresh_hz <= 0.0) {
         throw std::runtime_error{"seconds must be > 0 and <= 60; refresh_hz must be > 0"};
     }
+    const std::string source = params.value("source", std::string{"guest"});
+    if (source != "guest" && source != "host") {
+        throw std::runtime_error{"source must be \"guest\" or \"host\""};
+    }
+    const bool host = source == "host";
+    const auto& count = host ? g_nx2_host_present_count : g_nx2_present_count;
+    const std::span<const std::atomic<u64>> ring =
+        host ? std::span<const std::atomic<u64>>{g_nx2_host_present_times_ns}
+             : std::span<const std::atomic<u64>>{g_nx2_present_times_ns};
     // lookback: the presents of the last `seconds`, still in the ring, without waiting. Requests
     // are served one at a time, so this is how a client measures across a blocking input call.
     if (params.value("lookback", false)) {
-        const u64 after = g_nx2_present_count.load(std::memory_order_relaxed);
-        const u64 capacity = g_nx2_present_times_ns.size();
+        const u64 after = count.load(std::memory_order_relaxed);
+        const u64 capacity = ring.size();
         const u64 end_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                std::chrono::steady_clock::now().time_since_epoch())
                                .count();
         const u64 span_ns = static_cast<u64>(seconds * 1e9);
-        return ReadFrameTimes(after > capacity ? after - capacity : 0, after,
-                              end_ns > span_ns ? end_ns - span_ns : 0, end_ns, refresh_hz);
+        return ReadFrameTimes(ring, after > capacity ? after - capacity : 0, after,
+                              end_ns > span_ns ? end_ns - span_ns : 0, end_ns, refresh_hz, host);
     }
-    const u64 before = g_nx2_present_count.load(std::memory_order_relaxed);
+    const u64 before = count.load(std::memory_order_relaxed);
     const auto begin = std::chrono::steady_clock::now();
     while (std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count() <
                seconds &&
@@ -261,40 +270,15 @@ json FrameTimes(ToolState& state, const json& params) {
         std::this_thread::sleep_for(20ms);
     }
     const auto end = std::chrono::steady_clock::now();
-    const u64 after = g_nx2_present_count.load(std::memory_order_relaxed);
+    const u64 after = count.load(std::memory_order_relaxed);
     const u64 begin_ns =
         std::chrono::duration_cast<std::chrono::nanoseconds>(begin.time_since_epoch()).count();
     const u64 end_ns =
         std::chrono::duration_cast<std::chrono::nanoseconds>(end.time_since_epoch()).count();
-    return ReadFrameTimes(before, after, begin_ns, end_ns, refresh_hz);
+    return ReadFrameTimes(ring, before, after, begin_ns, end_ns, refresh_hz, host);
 }
 
-} // Anonymous namespace
-
-json ReadFrameTimes(u64 before, u64 after, u64 begin_ns, u64 end_ns, double refresh_hz) {
-    const u64 capacity = g_nx2_present_times_ns.size();
-    bool truncated = after < before || after - before > capacity;
-    const u64 first = (std::max)(before + 1, after > capacity ? after - capacity + 1 : u64{1});
-    std::vector<double> intervals;
-    u64 previous = 0;
-    for (u64 frame = after; frame >= first; --frame) {
-        const u64 timestamp =
-            g_nx2_present_times_ns[frame % capacity].load(std::memory_order_relaxed);
-        // The counter advances before its store; the slot can also be overwritten during a read.
-        if (timestamp < begin_ns || timestamp > end_ns) {
-            truncated |= timestamp > end_ns;
-            previous = 0;
-            continue;
-        }
-        if (previous != 0 && timestamp > previous) {
-            intervals.clear();
-        } else if (previous != 0) {
-            intervals.push_back(static_cast<double>(previous - timestamp) / 1'000'000.0);
-        }
-        previous = timestamp;
-    }
-
-    std::ranges::reverse(intervals);
+json IntervalStats(std::vector<double> intervals, double refresh_hz) {
     json recent = json::array();
     for (size_t i = intervals.size() > 120 ? intervals.size() - 120 : 0; i < intervals.size(); ++i) {
         recent.push_back(std::round(intervals[i] * 10.0) / 10.0);
@@ -334,8 +318,62 @@ json ReadFrameTimes(u64 before, u64 after, u64 begin_ns, u64 end_ns, double refr
             {"min_ms", frames == 0 ? 0.0 : intervals.front()},
             {"vsync_buckets", {{"1", share(0)}, {"2", share(1)}, {"3", share(2)}, {"4+", share(3)}}},
             {"stutters", stutters},
-            {"intervals_ms", std::move(recent)},
-            {"truncated", truncated}};
+            {"intervals_ms", std::move(recent)}};
+}
+
+} // Anonymous namespace
+
+json ReadFrameTimes(std::span<const std::atomic<u64>> ring, u64 before, u64 after, u64 begin_ns,
+                    u64 end_ns, double refresh_hz, bool fifo_display) {
+    const u64 capacity = ring.size();
+    bool truncated = after < before || after - before > capacity;
+    const u64 first = (std::max)(before + 1, after > capacity ? after - capacity + 1 : u64{1});
+    // Retained timestamps, newest first; 0 marks a gap no interval may span.
+    std::vector<u64> times;
+    std::vector<double> intervals;
+    u64 previous = 0;
+    for (u64 frame = after; frame >= first; --frame) {
+        const u64 timestamp = ring[frame % capacity].load(std::memory_order_relaxed);
+        // The counter advances before its store; the slot can also be overwritten during a read.
+        if (timestamp < begin_ns || timestamp > end_ns) {
+            truncated |= timestamp > end_ns;
+            previous = 0;
+            times.push_back(0);
+            continue;
+        }
+        if (previous != 0 && timestamp > previous) {
+            intervals.clear();
+            times.clear();
+        } else if (previous != 0) {
+            intervals.push_back(static_cast<double>(previous - timestamp) / 1'000'000.0);
+        }
+        previous = timestamp;
+        times.push_back(timestamp);
+    }
+    std::ranges::reverse(intervals);
+    json result = IntervalStats(std::move(intervals), refresh_hz);
+    result["truncated"] = truncated;
+    if (fifo_display) {
+        // FIFO shows at most one image per refresh, in order: a present queued while earlier ones
+        // still wait is shown one refresh after its predecessor, not when it was queued.
+        const double period_ms = 1000.0 / refresh_hz;
+        std::vector<double> shown;
+        std::optional<double> last_shown;
+        for (auto it = times.rbegin(); it != times.rend(); ++it) {
+            if (*it == 0) {
+                last_shown.reset();
+                continue;
+            }
+            const double queued = static_cast<double>(*it) / 1'000'000.0;
+            const double at = last_shown ? (std::max)(queued, *last_shown + period_ms) : queued;
+            if (last_shown) {
+                shown.push_back(at - *last_shown);
+            }
+            last_shown = at;
+        }
+        result["fifo_display"] = IntervalStats(std::move(shown), refresh_hz);
+    }
+    return result;
 }
 
 namespace {
