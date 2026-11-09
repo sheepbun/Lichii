@@ -105,6 +105,7 @@ jobs:
             -DBUILD_TESTING=ON \
             -DYUZU_TESTS=ON \
             -DENABLE_QT=ON \
+            -DENABLE_QT_TRANSLATION=ON \
             -DYUZU_CMD=ON \
             -DYUZU_ROOM=OFF \
             -DYUZU_ROOM_STANDALONE=OFF \
@@ -128,6 +129,11 @@ jobs:
 
       - name: Test debug adapter
         run: python3 tools/nx2/test_debug_mcp.py
+
+      - name: Test cache metrics and bench
+        run: |
+          python3 tools/nx2/test_cache_metrics.py
+          python3 tools/nx2/test_cache_bench.py
 
       - name: Test ThreadWorker wake-ups
         run: |

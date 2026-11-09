@@ -403,6 +403,8 @@ struct Info {
                uses_subgroup_shuffles || uses_subgroup_mask || uses_quad_shuffles ||
                uses_fswzadd;
     }
+
+    bool operator==(const Info&) const = default;
 };
 
 template <typename Descriptors>

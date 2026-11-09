@@ -292,7 +292,11 @@ if(YUZU_TESTS)
     add_subdirectory(tests)
 endif()
 
-if(YUZU_CMD)
+if (LICHII_FUZZERS)
+    add_subdirectory(fuzz)
+endif()
+
+if (YUZU_CMD)
     add_subdirectory(yuzu_cmd)
     set_target_properties(yuzu-cmd PROPERTIES OUTPUT_NAME "eden-cli")
 endif()

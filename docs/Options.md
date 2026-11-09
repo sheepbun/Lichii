@@ -36,6 +36,8 @@ These options control dependencies.
   - Needed for gyroscopes
 - `ENABLE_DEBUG_TOOLS` (OFF) Enables debugging and development tools, see [tools](../tools/README.md).
 - `ENABLE_WERROR` (ON) Enables warnings as errors (-Werror).
+- `LICHII_FUZZERS` (OFF) Builds the libFuzzer harnesses for the game-file parsers and instruments the whole build with ASan and UBSan, see [Fuzzing](./Fuzzing.md).
+  - Clang only
 
 ### Flavors
 
@@ -70,7 +72,7 @@ The following options are desktop only.
 Also desktop-only, but apply strictly to Qt
 
 - `ENABLE_QT` (ON) Enable the Qt frontend (recommended)
-- `ENABLE_QT_TRANSLATION` (OFF) Enable translations for the Qt frontend
+- `ENABLE_QT_TRANSLATION` (OFF) Enable translations for the Qt frontend. Release builds turn it on; it needs Qt Linguist Tools (`lrelease`)
 - `YUZU_USE_BUNDLED_QT` (OFF) Download bundled Qt binaries
   - Not recommended; use the system Qt.
 - `YUZU_QT_MIRROR` (string) What mirror to use for downloading the bundled Qt libraries

@@ -413,11 +413,16 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                         return ReduceSemaphore((flags >> 20) & 7, (flags >> 24) & 1, base, payload);
                     });
                     rasterizer->SignalFence([this, address, payload, flags, queued] {
-                        const u32 value = ReduceSemaphore((flags >> 20) & 7, (flags >> 24) & 1,
-                                                          memory_manager.Read<u32>(address), payload);
+                        const auto combine = [&](u32 current) {
+                            return ReduceSemaphore((flags >> 20) & 7, (flags >> 24) & 1, current, payload);
+                        };
+                        const u32 guest = memory_manager.Read<u32>(address);
+                        const u32 value = combine(guest);
                         memory_manager.Write<u32>(address, value);
                         if (const auto device = memory_manager.GpuToCpuAddress(address)) {
-                            Tegra::Nx2SemaphoreWaiters::Get().OnWrite(*device, value);
+                            Tegra::Nx2SemaphoreWaiters::Get().OnWrite(
+                                *device, Tegra::Nx2MirrorShadow::Get().NoteCombinedRelease(
+                                             *device, address, guest, value, combine));
                         }
                         RetireRelease(queued, value);
                         static const u64 watch = [] {
@@ -442,10 +447,14 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                         return (std::max)(base, payload);
                     });
                     rasterizer->SignalFence([this, address, payload, queued] {
-                        const u32 value = (std::max)(memory_manager.Read<u32>(address), payload);
+                        const auto combine = [payload](u32 current) { return (std::max)(current, payload); };
+                        const u32 guest = memory_manager.Read<u32>(address);
+                        const u32 value = combine(guest);
                         memory_manager.Write<u32>(address, value);
                         if (const auto device = memory_manager.GpuToCpuAddress(address)) {
-                            Tegra::Nx2SemaphoreWaiters::Get().OnWrite(*device, value);
+                            Tegra::Nx2SemaphoreWaiters::Get().OnWrite(
+                                *device, Tegra::Nx2MirrorShadow::Get().NoteCombinedRelease(
+                                             *device, address, guest, value, combine));
                         }
                         RetireRelease(queued, value);
                     });
@@ -1800,6 +1809,31 @@ void KeplerCompute::FrontCallMethod(Core::System& system, VideoCommon::GpuSplit&
     }
     FrontApply(fs, method, argument);
     split.Method(this, method, argument, is_last_call, segment);
+    if (method == 0x6c3) {
+        FrontNoteReport(split, fs, argument);
+    }
+}
+
+void KeplerCompute::FrontNoteReport(VideoCommon::GpuSplit& split, const FrontState& fs,
+                                    u32 control) {
+    // SET_REPORT_SEMAPHORE_D was sent: what ProcessNativeReportSemaphore will write on the back.
+    const u32 operation = control & 3;
+    if (operation != 0 && operation != 2) {
+        return;
+    }
+    const GPUVAddr address =
+        (GPUVAddr{fs.registers[0x6c0] & 0x1ffffff} << 32) | fs.registers[0x6c1];
+    const auto device = memory_manager.GpuToCpuAddress(address);
+    if (!device) {
+        return;
+    }
+    // A reduction combines the payload with the word's value then.
+    const bool reduction = ((control >> 3) & 1) != 0;
+    split.NoteSemaphoreWrite(*device, fs.registers[0x6c2], !reduction);
+    if (!reduction && ((control >> 28) & 1) == 0) {
+        // 64 bits (a timestamp follows).
+        split.NoteSemaphoreWrite(*device + 4, 0, true);
+    }
 }
 
 void KeplerCompute::FrontCallMultiMethod(Core::System& system, VideoCommon::GpuSplit& split,
@@ -1818,6 +1852,11 @@ void KeplerCompute::FrontCallMultiMethod(Core::System& system, VideoCommon::GpuS
         }
     }
     split.MultiMethod(this, method, base_start, amount, methods_pending, segment);
+    if (method == 0x6c3) {
+        for (u32 i = 0; i < amount; ++i) {
+            FrontNoteReport(split, fs, base_start[i]);
+        }
+    }
 }
 
 void KeplerCompute::FrontRunMacro(Core::System& system, VideoCommon::GpuSplit& split,
@@ -1839,6 +1878,9 @@ void KeplerCompute::FrontRunMacro(Core::System& system, VideoCommon::GpuSplit& s
         }
         FrontApply(fs, address, value);
         split.MacroWrite(this, address, value);
+        if (address == 0x6c3) {
+            FrontNoteReport(split, fs, value);
+        }
         return true;
     };
 #ifdef ARCHITECTURE_x86_64

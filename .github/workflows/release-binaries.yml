@@ -176,6 +176,7 @@ jobs:
             -DYUZU_ROOM=OFF
             -DYUZU_ROOM_STANDALONE=OFF
             -DYUZU_USE_BUNDLED_QT=OFF
+            -DENABLE_QT_TRANSLATION=ON
             "-DCMAKE_PREFIX_PATH=$QT_ROOT_DIR"
             -DYUZU_USE_BUNDLED_SDL3=ON
             -DVulkanHeaders_FORCE_BUNDLED=ON
@@ -229,9 +230,10 @@ jobs:
           set -euo pipefail
           test -x build/release/bin/lichii
           test -x build/release/bin/eden-cli
+          test -f build/release/bin/libnxformat.so
           strip build/release/bin/lichii build/release/bin/eden-cli
           tar -czf "lichii-${GITHUB_SHA}-${{ matrix.platform }}.tar.gz" \
-            -C build/release/bin lichii eden-cli nx2_switches.txt
+            -C build/release/bin lichii eden-cli nx2_switches.txt libnxformat.so
           ls -la "lichii-${GITHUB_SHA}-${{ matrix.platform }}.tar.gz"
 
       # A self-contained AppImage: linuxdeploy bundles every library the two programs need except
