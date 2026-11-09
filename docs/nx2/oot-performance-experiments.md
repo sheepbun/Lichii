@@ -400,7 +400,11 @@ pan/walk cycles, FG on; `-fprofile-update=prefer-atomic`, use with
 | current vs PGO | 31.2/31.5 vs 32.3/33.0 | 30.0/30.1 vs 31.3/31.4 |
 | PGO vs PGO+LTO | 34.7/34.2 vs 35.6/36.6 | 32.8/33.0 vs 33.2/33.4 |
 
-About +8% still and +5% panning over the plain Release build; pan p99 also improved. Logs
+About +8% still and +5% panning over the plain Release build; pan p99 also improved.
+An A/A check (identical settings in all four runs, `P5_fmc*`) put the middle pair of an
+A/B/B/A 6% above the outer pair, so single A/B/B/A sequences are not enough here. Eight
+strictly alternating fixed-view runs (`P5_alt*`) confirm it: every PGO+LTO window
+(30.6-33.2 FPS, mean 32.2) beat every plain-build window (28.6-30.5, mean 29.7), +8%. Logs
 show the same errors and warnings as the plain build, no device loss. The tree's
 `-Werror=all` trips on PGO-only maybe-uninitialized warnings, so the use build appends `-w`
 through a compiler launcher; LTO reports a pre-existing Boost.System ODR mismatch
