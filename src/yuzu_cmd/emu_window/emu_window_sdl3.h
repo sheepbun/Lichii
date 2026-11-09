@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <cstdlib>
+#include <mutex>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -46,6 +47,9 @@ public:
 
     /// Sets the title the titlebar timer prepared; call from the main thread.
     void ApplyPendingTitle();
+
+    /// Names the game in the title now; the titlebar timer adds FPS from its next tick.
+    void SetGameTitle(std::string title);
 
     /// Returns if window is shown (not minimized)
     bool IsShown() const override;
@@ -99,6 +103,8 @@ protected:
     /// Periodic changer of titlebar (independent of event loop)
     SDL_TimerID titlebar_timer;
     std::atomic<std::string*> pending_title{};
+    std::mutex game_name_mutex;
+    std::string game_name; ///< Set by SetGameTitle, else by the titlebar timer from GetGameName
 
     // Mouse resetter once it
     SDL_TimerID mouse_timer;
