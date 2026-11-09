@@ -205,7 +205,7 @@ effect size, but every metric moved the wrong way and the tails by a wide
 margin; the extra suspension and resnapshot cost more than the overlap gains.
 Reverted; patch kept at the path above.
 
-## C4-06: frame critical path and host-GPU waits on the back (investigating)
+## C4-06: frame critical path and host-GPU waits on the back (retained)
 
 The present statistics in `C4_o_static_base` (fixed view) split each 32.5 ms
 frame into about 7.7 ms of game CPU work and 24.8 ms blocked in nx2:vi2 229
@@ -268,3 +268,42 @@ Remaining forced waits: the initial acquire path still calls `ReleaseFences`
 about 1100 times a second (175-250 ms/s in total), though the registry matches
 none of them. Which call pays the host-GPU backlog varies between runs (initial
 or resume poll); the total stays about the same.
+
+Those initial-path waits turned out to be releases that bypass `CounterReport`.
+Switch 2 QMD max releases (flag bit 19) and reduction releases (bit 26) call
+`SignalFence` directly, e.g. the QMD-completion counters at device `0x2b030`
+and `0x86000`, which each acquire wants exactly one past. They are now queued with
+the value they will write, predicted on the back from the last queued value
+(or memory) because releases are written in queue order. Registry entries
+retire after their memory write and are bounded at 4096. With these,
+forced initial-path waits fell from ~2700 to ~490 per 2 s (≈253 → ≈22 ms/s);
+no acquire was latched during a wait any more (`C4_r*`).
+
+Retained as `6d025225af`, unconditional, with unit tests
+(`[semaphore_waiters]`; 1045 test cases pass). Final A/B/B/A against the
+W3 merge (`307b305b29`):
+
+| Run | Scene | Binary | FPS | 1% low | p99 ms |
+|---|---|---|---:|---:|---:|
+| C4_f1_base | Fixed | merge base | 29.95 | 22.85 | 42.07 |
+| C4_f2_qr | Fixed | queued release | 32.12 | 20.71 | 38.26 |
+| C4_f3_qr | Fixed | queued release | 32.66 | 25.25 | 37.80 |
+| C4_f4_base | Fixed | merge base | 30.44 | 22.98 | 42.23 |
+| C4_g1_base | Pan/walk | merge base | 29.94 | 14.00 | 57.23 |
+| C4_g2_qr | Pan/walk | queued release | 31.33 | 14.52 | 56.01 |
+| C4_g3_qr | Pan/walk | queued release | 30.82 | 13.53 | 53.30 |
+| C4_g4_base | Pan/walk | merge base | 30.07 | 12.09 | 59.87 |
+
+Fixed view +7.3%, pan/walk +3.6%. Fixed-view screenshots differ from the
+baseline no more than two baselines differ from each other (RMSE 0.085 vs
+0.091); no semaphore-timeout, MME or device-loss warnings. Pan/walk windows
+still built 79-115 pipelines.
+
+The bottleneck moved. `C4_u2_offcpu_qr` shows the back idle 323 ms/s
+(was 165), and the front sleeping 128 ms/s in 2485 short polls
+of channels suspended on semaphores the game's CPU releases, plus 163 ms/s
+waiting for command lists. Guest cores are about 50% idle in
+`PhysicalCore::Idle`. The GPU threads now mostly wait on the game's own threads,
+which release command chunks as they finish writing them. Next: the guest
+side (single-thread speed of those threads, host core placement) and
+the 7.7 ms per-frame CPU phase before the GPU work starts.
