@@ -7,9 +7,9 @@
 #pragma once
 
 #include <algorithm>
-#include <cstdlib>
 #include <array>
 #include <bit>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -20,12 +20,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/container/unordered_map.h"
-#include <boost/container/static_vector.hpp>
 #include <boost/container/small_vector.hpp>
+#include <boost/container/static_vector.hpp>
+#include "common/container/unordered_map.h"
 
 #include "common/common_types.h"
-#include "common/spin_recursive_mutex.h"
 #include "common/div_ceil.h"
 #include "common/literals.h"
 #include "common/lru_cache.h"
@@ -34,13 +33,13 @@
 #include "common/settings.h"
 #include "common/slot_vector.h"
 #include "shader_recompiler/shader_info.h"
+#include "common/spin_recursive_mutex.h"
 #include "video_core/buffer_cache/buffer_base.h"
 #include "video_core/buffer_cache/read_trap_tracker.h"
 #include "video_core/buffer_cache/virtual_range_cache.h"
 #include "video_core/control/channel_state_cache.h"
 #include "video_core/delayed_destruction_ring.h"
 #include "video_core/dirty_flags.h"
-#include "video_core/engines/maxwell_3d.h"
 #include "video_core/engines/kepler_compute.h"
 #include "video_core/engines/maxwell_3d.h"
 #include "video_core/memory_manager.h"
@@ -417,7 +416,8 @@ public:
             }
             const Buffer* host = nullptr;
             u32 offset = 0;
-            if (const BufferId id = page_table[binding.device_addr >> CACHING_PAGEBITS]) {
+            const u64 page = binding.device_addr >> CACHING_PAGEBITS;
+            if (const BufferId id = page < page_table.size() ? page_table[page] : BufferId{}) {
                 const Buffer& buffer = slot_buffers[id];
                 if (buffer.IsInBounds(binding.device_addr, size)) {
                     host = &buffer;
@@ -431,12 +431,13 @@ public:
             ForEachEnabledBit(channel_state->enabled_compute_uniform_buffer_mask, [&](u32 index) {
                 const Binding& binding = channel_state->compute_uniform_buffers[index];
                 visit(5, false, index, false, binding,
-                      sizes ? std::min(binding.size, (*sizes)[index]) : binding.size);
+                      sizes ? (std::min)(binding.size, (*sizes)[index]) : binding.size);
             });
             ForEachEnabledBit(channel_state->enabled_compute_storage_buffers, [&](u32 index) {
                 const Binding& binding = channel_state->compute_storage_buffers[index];
-                visit(5, true, index, ((channel_state->written_compute_storage_buffers >> index) & 1) != 0,
-                      binding, binding.size);
+                visit(5, true, index,
+                      ((channel_state->written_compute_storage_buffers >> index) & 1) != 0, binding,
+                      binding.size);
             });
             return;
         }
@@ -445,7 +446,7 @@ public:
             ForEachEnabledBit(channel_state->enabled_uniform_buffer_masks[stage], [&](u32 index) {
                 const Binding& binding = channel_state->uniform_buffers[stage][index];
                 visit(stage, false, index, false, binding,
-                      sizes ? std::min(binding.size, (*sizes)[stage][index]) : binding.size);
+                      sizes ? (std::min)(binding.size, (*sizes)[stage][index]) : binding.size);
             });
             ForEachEnabledBit(channel_state->enabled_storage_buffers[stage], [&](u32 index) {
                 const Binding& binding = channel_state->storage_buffers[stage][index];
@@ -575,7 +576,8 @@ private:
 
     void UpdateComputeTextureBuffers();
 
-    void MarkWrittenBuffer(BufferId buffer_id, DAddr device_addr, u32 size, bool needs_sync = false);
+    void MarkWrittenBuffer(BufferId buffer_id, DAddr device_addr, u32 size,
+                           bool needs_sync = false);
 
     /// Counts a GPU write to the command list pages in the range (invalidating their copies) and,
     /// while collecting, asks for new copies.
@@ -589,8 +591,7 @@ private:
 
     void JoinOverlap(BufferId new_buffer_id, BufferId overlap_id, bool accumulate_stream_score);
 
-    [[nodiscard]] BufferId CreateBuffer(DAddr device_addr, u32 wanted_size,
-                                        bool sparse_compatible);
+    [[nodiscard]] BufferId CreateBuffer(DAddr device_addr, u32 wanted_size, bool sparse_compatible);
 
     void Register(BufferId buffer_id);
 
@@ -723,6 +724,29 @@ private:
         return AsyncBufferDownloads() || memory_tracker.IsRegionPreflushable(device_addr, size);
     }
 
+    /// Whether the range holds GPU-written data that no fence downloads (not Preflushable).
+    bool HasGpuWritesNotDownloadedAtFence(DAddr device_addr, u64 size) {
+        if (AsyncBufferDownloads()) {
+            return false;
+        }
+        bool found = false;
+        memory_tracker.ForEachDownloadRange(
+            device_addr, size, false, [&](u64 start, u64 range_size) {
+                if (found) {
+                    return;
+                }
+                u64 covered = 0;
+                memory_tracker.ForEachPreflushableRange(
+                    start, range_size, [&](u64 lower, u64 length) {
+                        const u64 begin = (std::max)(lower, start);
+                        const u64 end = (std::min)(lower + length, start + range_size);
+                        covered += end > begin ? end - begin : 0;
+                    });
+                found = covered < range_size;
+            });
+        return found;
+    }
+
     /// Queues a GPU write for download at the next fence where DownloadsAtFence holds. With only
     /// Preflushable marks, just the marked pages are queued: a write that covers one marked page
     /// of a large buffer would otherwise copy the whole buffer back at every fence.
@@ -831,7 +855,7 @@ private:
         u64 copy_tick{};   ///< GPU tick that completes the copy
         /// `writes` when the front last flushed the page: guest memory holds it while equal
         u64 synced_writes{~u64{0}};
-        u32 copy_begin{};  ///< Bytes of the page the copy holds (a buffer can end inside it)
+        u32 copy_begin{}; ///< Bytes of the page the copy holds (a buffer can end inside it)
         u32 copy_end{};
         /// Written outside a compute dispatch or a DMA copy (a draw's storage writes) at least
         /// once: the front can't tell from what it sent which draws write the page, so it reads

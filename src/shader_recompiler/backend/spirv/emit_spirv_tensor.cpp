@@ -249,15 +249,19 @@ void DefineSoftwareMatrixFunctions(EmitContext& ctx, const IR::Program& program)
             const Id magnitude = and_(bits, 0x7fffffffU);
             const Id tie = and_(ctx.OpShiftRightLogical(u32ty, magnitude, imm(13)), 1);
             const Id rounded = and_(add(add(magnitude, imm(0xfff)), tie), ~0x1fffU);
-            const Id normal = ctx.OpSelect(u32ty,
-                ctx.OpUGreaterThanEqual(ctx.U1, rounded, imm(0x47800000)), imm(0x7f800000), rounded);
-            const Id scaled = ctx.OpFMul(f32ty, ctx.OpBitcast(f32ty, magnitude), ctx.Const(16777216.0f));
-            const Id subnormal = ctx.OpBitcast(u32ty,
-                ctx.OpFMul(f32ty, ctx.OpRoundEven(f32ty, scaled), ctx.Const(0x1p-24f)));
-            const Id finite = ctx.OpSelect(u32ty,
-                ctx.OpUGreaterThanEqual(ctx.U1, magnitude, imm(0x38800000)), normal, subnormal);
-            const Id result = ctx.OpSelect(u32ty,
-                ctx.OpUGreaterThanEqual(ctx.U1, magnitude, imm(0x7f800000)), magnitude, finite);
+            const Id normal =
+                ctx.OpSelect(u32ty, ctx.OpUGreaterThanEqual(ctx.U1, rounded, imm(0x47800000)),
+                             imm(0x7f800000), rounded);
+            const Id scaled =
+                ctx.OpFMul(f32ty, ctx.OpBitcast(f32ty, magnitude), ctx.Const(16777216.0f));
+            const Id subnormal = ctx.OpBitcast(
+                u32ty, ctx.OpFMul(f32ty, ctx.OpRoundEven(f32ty, scaled), ctx.Const(0x1p-24f)));
+            const Id finite =
+                ctx.OpSelect(u32ty, ctx.OpUGreaterThanEqual(ctx.U1, magnitude, imm(0x38800000)),
+                             normal, subnormal);
+            const Id result =
+                ctx.OpSelect(u32ty, ctx.OpUGreaterThanEqual(ctx.U1, magnitude, imm(0x7f800000)),
+                             magnitude, finite);
             return ctx.OpBitcast(f32ty, ctx.OpBitwiseOr(u32ty, result, and_(bits, 0x80000000)));
         };
         const Id type = ctx.TypeFunction(ctx.U32[2], ctx.U32[4], ctx.U32[2], ctx.U32[2]);
@@ -268,11 +272,11 @@ void DefineSoftwareMatrixFunctions(EmitContext& ctx, const IR::Program& program)
         const Id matrix_c = ctx.OpFunctionParameter(ctx.U32[2]);
         ctx.AddLabel();
         const Id counter = ctx.AddLocalVariable(ctx.TypePointer(spv::StorageClass::Function, u32ty),
-                                           spv::StorageClass::Function);
+                                                spv::StorageClass::Function);
         std::array<Id, 4> accumulators;
         for (auto& acc : accumulators)
             acc = ctx.AddLocalVariable(ctx.TypePointer(spv::StorageClass::Function, f32ty),
-                                 spv::StorageClass::Function);
+                                       spv::StorageClass::Function);
         std::array<Id, 8> inputs;
         for (u32 i = 0; i < 4; ++i)
             inputs[i] = ctx.OpCompositeExtract(u32ty, matrix_a, i);

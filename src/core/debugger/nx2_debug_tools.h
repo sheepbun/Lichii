@@ -4,6 +4,7 @@
 #pragma once
 
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <span>
@@ -35,7 +36,7 @@ struct ToolState;
 class Service {
 public:
     explicit Service(System& system, std::string title, u64 program_id, const Endpoint& endpoint,
-                     std::string dump_directory);
+                     std::filesystem::path dump_directory);
     ~Service();
 
     Service(const Service&) = delete;
