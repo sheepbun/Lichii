@@ -140,7 +140,7 @@ register escape, MME failure or device loss was seen in the two candidate runs;
 this does not replace differential correctness validation. Preserve the port
 for testing against faster GPUBack implementations.
 
-## C4-04: one macro DMA handoff (investigating)
+## C4-04: one macro DMA handoff (rejected)
 
 The current front path fully drains the back, then makes another synchronous
 back request for query flushing, plus a separate request when buffer data is
@@ -160,3 +160,19 @@ quarantine (`1bb45da83d`) were inspected; neither supplies this smaller change.
 Builds and heavy profile processing now share the benchmark lock. C4's wrapper
 also records CPU frequencies, available memory and interfering compiler/perf
 processes every two seconds, rejecting runs with detected interference.
+
+Results with quiet-host monitoring: pan/walk baseline `C4_l_macro_base` 29.756
+FPS, candidate `C4_m_fused` 29.305 FPS. Fixed view candidate `C4_n_static_fused`
+30.467 FPS versus subsequent baseline `C4_o_static_base` 30.711 FPS; respective
+p99 47.812/45.494 ms and 1% lows 19.771/19.783 FPS. Fixed windows compiled no
+pipelines. This small sample does not prove a regression, but shows no reason
+to retain the change. The further repeats were cancelled at the exploratory
+2% fixed-view improvement threshold; the patch was reverted. Preserved at
+`.cache/C4/fused-candidate.patch` and `.cache/C4/fused/`. All 1041 test cases
+passed before benchmarking it.
+
+W2b completed with no integration commits. Its uniform-bank skip remains
+excluded: per-page CPU tracking does not cover all aliases and host writers.
+The next investigation is acquire/fence synchronization. Upstream `a4f6287327`
+(PR 949) requires immediate-release settings for its drain-free checks, so
+that fast path is ineligible at the High accuracy used by this mission.
