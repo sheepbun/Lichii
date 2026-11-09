@@ -318,7 +318,6 @@ TEST_CASE("Star Fox ULDC U16 rejects unrepresentable offsets and unsupported mod
              std::array{38U, 16U, 0x8000U}, std::array{38U, 16U, 0xfffeU},
              std::array{16U, 8U, 63U}, std::array{16U, 8U, 64U},
              std::array{54U, 5U, 18U}, std::array{62U, 2U, 1U},
-             std::array{73U, 3U, 1U}, std::array{73U, 3U, 3U},
              std::array{73U, 3U, 6U}, std::array{78U, 2U, 2U},
              std::array{91U, 1U, 1U}}) {
         auto instruction = CapturedUniformLoad;
@@ -326,6 +325,16 @@ TEST_CASE("Star Fox ULDC U16 rejects unrepresentable offsets and unsupported mod
         const auto lowered = LowerToMaxwell(std::array{instruction, Exit});
         CHECK_FALSE(lowered);
         CHECK(lowered.instructions.empty());
+    }
+    // S8 and S16 (widths 1 and 3) are LDC.S8 and LDC.S16, which the Maxwell translator
+    // sign-extends (GetCbuf with is_signed).
+    for (const u32 width : {1U, 3U}) {
+        auto instruction = CapturedUniformLoad;
+        SetBits(instruction, 73, 3, width);
+        const auto lowered = LowerToMaxwell(std::array{instruction, Exit});
+        INFO(lowered.error);
+        REQUIRE(lowered);
+        CHECK(((lowered.instructions.front() >> 48) & 7) == width);
     }
     auto indexed = CapturedUniformLoad;
     SetBits(indexed, 0, 12, 0xabb);
@@ -335,6 +344,8 @@ TEST_CASE("Star Fox ULDC U16 rejects unrepresentable offsets and unsupported mod
     INFO(indexed_load.error);
     CHECK(indexed_load);
     SetBits(indexed, 73, 3, 1);
+    CHECK(LowerToMaxwell(std::array{indexed, Exit}));
+    SetBits(indexed, 73, 3, 6);
     CHECK_FALSE(LowerToMaxwell(std::array{indexed, Exit}));
 }
 
