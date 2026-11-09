@@ -393,7 +393,7 @@ TEST_CASE("Star Fox uniform U16 conversion rejects invalid uniform sources and o
         CHECK_FALSE(lowered);
         CHECK(lowered.instructions.empty());
     }
-    for (const u32 mode : {0x00101000U, 0x08101400U, 0x08109000U, 0x08100800U}) {
+    for (const u32 mode : {0x00101000U, 0x08109000U, 0x08100800U}) {
         auto instruction = CapturedI2F;
         instruction.words[2] = mode;
         const auto lowered = LowerToMaxwell(std::array{instruction, Exit});

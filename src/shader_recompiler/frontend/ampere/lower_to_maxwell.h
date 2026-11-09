@@ -3259,10 +3259,11 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
                 break;
             }
             if (((opcode == 0x306 && (insn.words[2] & ~0x400U) == 0x00101000) ||
-                 (opcode == 0xd06 && insn.words[2] == 0x08101000U && !insn.Bits(61, 1) &&
+                 (opcode == 0xd06 && (insn.words[2] & ~0x400U) == 0x08101000U &&
                   !insn.Bits(24, 8) && !(insn.words[3] & 0xc00001ffU))) &&
-                !(insn.words[1] & 0xcfffff00U) && source != ~0U) {
+                !(insn.words[1] & 0xefffff00U) && source != ~0U) {
                 // I2F.U16/S16 Rd, Rs(.H1): signedness and the halfword selector are independent.
+                // Bit 60 is the only selector bit (H1 is Maxwell's byte 2); bit 61 is rejected.
                 emit(base(0x5cb8000000000000ULL) | (u64{2} << 8) | (u64{1} << 10) |
                      (u64{insn.Bits(74, 1)} << 13) | (u64{source} << 20) |
                      (u64{insn.Bits(60, 2) * 2} << 41));
