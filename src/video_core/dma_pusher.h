@@ -131,6 +131,8 @@ struct CommandList final {
     /// that waited behind one, reads memory instead: games write the commands it runs before they
     /// release the acquire.
     u64 snapshot_suspensions = 0;
+    /// EDEN_NX2_LATE_READ_CHECK: Nx2LateRead::SubmitEpoch() when the list was submitted.
+    u64 late_read_epoch = 0;
 };
 
 /// FNV-1a over pushbuffer words (EDEN_NX2_PB_CHECK).

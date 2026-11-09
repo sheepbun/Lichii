@@ -28,6 +28,7 @@
 #include "video_core/memory_manager.h"
 #include "video_core/nx2.h"
 #include "video_core/nx2_cmdpage_diag.h"
+#include "video_core/nx2_late_read.h"
 #include "video_core/rasterizer_interface.h"
 
 namespace Tegra {
@@ -121,6 +122,9 @@ bool DmaPusher::Step() {
     }
 
     CommandList& command_list = dma_pushbuffer.front();
+    if (VideoCommon::Nx2LateRead::Enabled()) {
+        VideoCommon::Nx2LateRead::SetListEpoch(command_list.late_read_epoch);
+    }
 
     const size_t prefetch_size = command_list.prefetch_command_list.size();
     const size_t command_list_size = command_list.command_lists.size();
@@ -216,7 +220,7 @@ bool DmaPusher::Step() {
         }
         // A resumed entry is read again: the words after the acquire may be new by now.
         // A safe read flushes the caches, which belong to the split's back thread while it runs
-        // (the split only starts with unsafe reads; the settings can change mid-game).
+        // (the split does not run with Safe DMA; the settings can change mid-game).
         const bool use_safe = !VideoCommon::GpuSplit::Get().Active() &&
                               (Settings::IsDMALevelDefault() ? Settings::IsGPULevelHigh() : Settings::IsDMALevelSafe());
         if (!gpu_written && VideoCommon::GpuSplit::Get().Active() &&

@@ -19,6 +19,8 @@ void CollectShaderInfoPass(Environment& env, IR::Program& program);
 void ConditionalBarrierPass(IR::Program& program);
 void ConstantPropagationPass(Environment& env, IR::Program& program);
 void DeadCodeEliminationPass(IR::Program& program);
+/// Removes unused identities and invalidated instructions, and nothing else.
+void RemoveDeadIdentitiesPass(IR::Program& program);
 void GeometryCompactionPass(IR::Program& program, const HostTranslateInfo& host_info);
 void GlobalMemoryToStorageBufferPass(Environment& env, IR::Program& program,
                                      const HostTranslateInfo& host_info);

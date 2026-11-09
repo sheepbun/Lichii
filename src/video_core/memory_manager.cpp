@@ -352,6 +352,16 @@ template void MemoryManager::Write<u16>(GPUVAddr addr, u16 data);
 template void MemoryManager::Write<u32>(GPUVAddr addr, u32 data);
 template void MemoryManager::Write<u64>(GPUVAddr addr, u64 data);
 
+namespace {
+// EDEN_NX2_LATE_READ_CHECK: the device access hook, with the size and site the device level lacks.
+void NoteDeviceAccess(DAddr address, std::size_t size, const std::source_location& caller,
+                      bool write) {
+    if (const auto hook = Core::g_device_access_hook.load(std::memory_order_relaxed)) {
+        hook(address, size, caller.file_name(), caller.line(), nullptr, write);
+    }
+}
+} // Anonymous namespace
+
 u8* MemoryManager::GetPointer(GPUVAddr gpu_addr) {
     const auto address{GpuToCpuAddress(gpu_addr)};
     if (!address) {
@@ -458,6 +468,7 @@ void MemoryManager::ReadBlockImpl(GPUVAddr gpu_src_addr, void* dest_buffer, std:
         if (!unsafe) {
             rasterizer->FlushRegion(dev_addr_base, copy_amount, which);
         }
+        NoteDeviceAccess(dev_addr_base, copy_amount, caller, false);
         // A device page without memory (a sparse block nobody wrote yet) reads zero.
         if (const u8* physical = memory.GetPointer<u8>(dev_addr_base)) [[likely]] {
             std::memcpy(dest_buffer, physical, copy_amount);
@@ -471,6 +482,7 @@ void MemoryManager::ReadBlockImpl(GPUVAddr gpu_src_addr, void* dest_buffer, std:
         if (!unsafe) {
             rasterizer->FlushRegion(dev_addr_base, copy_amount, which);
         }
+        NoteDeviceAccess(dev_addr_base, copy_amount, caller, false);
         // A continuous big page may still have no host memory (a Switch 2 region backed as it is
         // written, while its backing is pending): the per-page copy handles that.
         u8* const physical = IsBigPageContinuous(page_index) ? memory.GetPointer<u8>(dev_addr_base)
@@ -501,6 +513,11 @@ void MemoryManager::ReadBlockUnsafe(GPUVAddr gpu_src_addr, void* dest_buffer, co
     // in title 1). Anything else, unmapped or sparse pages included, takes the full path.
     constexpr std::size_t SmallPage = 0x1000;
     if (size <= SmallPage && (gpu_src_addr & (SmallPage - 1)) + size <= SmallPage) {
+        if (Core::g_device_access_hook.load(std::memory_order_relaxed)) {
+            if (const auto address = GpuToCpuAddress(gpu_src_addr)) {
+                NoteDeviceAccess(*address, size, caller, false);
+            }
+        }
         if (const u8* const pointer = GetPointer(gpu_src_addr)) {
             std::memcpy(dest_buffer, pointer, size);
             return;
@@ -536,6 +553,7 @@ void MemoryManager::WriteBlockImpl(GPUVAddr gpu_dest_addr, const void* src_buffe
         if (u8* physical = memory.GetPointer<u8>(dev_addr_base)) [[likely]] {
             std::memcpy(physical, src_buffer, copy_amount);
         }
+        NoteDeviceAccess(dev_addr_base, copy_amount, std::source_location::current(), true);
         // After the copy: the buffer cache may upload the written bytes from guest memory.
         if (!unsafe) {
             rasterizer->InvalidateRegion(dev_addr_base, copy_amount, which);
@@ -554,6 +572,7 @@ void MemoryManager::WriteBlockImpl(GPUVAddr gpu_dest_addr, const void* src_buffe
         } else {
             memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount);
         }
+        NoteDeviceAccess(dev_addr_base, copy_amount, std::source_location::current(), true);
         if (!unsafe) {
             rasterizer->InvalidateRegion(dev_addr_base, copy_amount, which);
         }

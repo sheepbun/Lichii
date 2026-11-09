@@ -122,12 +122,12 @@ void GpuSplit::MaybeStart(Core::System& system_) {
     if (!wanted || !Tegra::g_nx2_ampere.load(std::memory_order_relaxed)) {
         return;
     }
-    // The front reads command lists straight from guest memory; a read that flushes the caches
-    // first (safe DMA, accurate GPU) would touch back-owned state. The settings can change
+    // The front reads command lists straight from guest memory. Accurate GPU keeps the split: the
+    // cache flushes its safe reads would do on the front are the back's, through the split's own
+    // paths (GPU-written command lists, MME DMA reads, fence releases). Only the Safe DMA setting,
+    // which flushes before every read, needs the caches on the front. The settings can change
     // mid-game: hand the engines back to the front (and start again when they allow it).
-    const bool safe_reads = Settings::IsDMALevelDefault() ? Settings::IsGPULevelHigh()
-                                                          : Settings::IsDMALevelSafe();
-    const bool allowed = !safe_reads && !Settings::IsGPULevelHigh() &&
+    const bool allowed = !Settings::IsDMALevelSafe() &&
                          Settings::values.renderer_backend.GetValue() == Settings::RendererBackend::Vulkan;
     if (active && !allowed) {
         Drain();

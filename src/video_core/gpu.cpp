@@ -35,6 +35,7 @@
 #include "video_core/engines/kepler_memory.h"
 #include "video_core/engines/maxwell_3d.h"
 #include "video_core/nx2_fast_draw.h"
+#include "video_core/nx2_late_read.h"
 #include "video_core/engines/maxwell_dma.h"
 #include "video_core/gpu.h"
 #include "video_core/pending_maps.h"
@@ -219,6 +220,9 @@ struct GPU::Impl {
 
     /// Push GPU command entries to be processed
     void PushGPUEntries(s32 channel, Tegra::CommandList&& entries) {
+        if (VideoCommon::Nx2LateRead::Enabled()) {
+            entries.late_read_epoch = VideoCommon::Nx2LateRead::SubmitEpoch();
+        }
         gpu_thread.SubmitList(channel, std::move(entries), is_async);
     }
 

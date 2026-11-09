@@ -403,13 +403,16 @@ void SsaRewritePass(IR::Program& program) {
         VisitBlock(pass, *block);
     }
     for (auto block = program.post_order_blocks.rbegin(); block != end; ++block) {
+        // Phis are created at the start of their block, and a trivial one is reinserted after the
+        // last phi: they are the leading instructions, so the rest of the block is skipped.
         for (IR::Inst& inst : (*block)->Instructions()) {
-            if (inst.GetOpcode() == IR::Opcode::Phi) {
-                if (inst.Type() == IR::Type::Opaque) {
-                    inst.SetFlags(GetConcreteType(&inst));
-                }
-                inst.OrderPhiArgs();
+            if (inst.GetOpcode() != IR::Opcode::Phi) {
+                break;
             }
+            if (inst.Type() == IR::Type::Opaque) {
+                inst.SetFlags(GetConcreteType(&inst));
+            }
+            inst.OrderPhiArgs();
         }
     }
 }

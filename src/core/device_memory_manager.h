@@ -28,6 +28,13 @@ constexpr size_t DEVICE_PAGEBITS = 12ULL;
 constexpr size_t DEVICE_PAGESIZE = 1ULL << DEVICE_PAGEBITS;
 constexpr size_t DEVICE_PAGEMASK = DEVICE_PAGESIZE - 1ULL;
 
+/// Diagnostic hook (EDEN_NX2_LATE_READ_CHECK), unset otherwise: called on each device memory
+/// access with its address, size (1 when unknown), source location if known, the caller's return
+/// address and whether it writes.
+using DeviceAccessHook = void (*)(u64 address, size_t size, const char* file, u32 line,
+                                  void* return_address, bool write);
+inline std::atomic<DeviceAccessHook> g_device_access_hook{};
+
 class DeviceMemory;
 
 namespace Memory {
