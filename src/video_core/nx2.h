@@ -6,15 +6,18 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstdlib>
 #include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "common/bit_util.h"
 #include "common/common_types.h"
+#include "common/logging.h"
 
 namespace Tegra {
 
@@ -444,6 +447,32 @@ public:
             return q.address == device_address;
         });
         return it == queued.rend() ? std::nullopt : std::optional<u32>{it->value};
+    }
+
+    /// EDEN_NX2_RELEASE_VERIFY: at a queued release's retirement, compare the value written
+    /// (none when the write was dropped) with the one predicted at queue time, which acquires
+    /// already used. A mismatch means a write the queue did not see (CPU or another engine).
+    static void Verify(u64 device_address, u32 predicted, std::optional<u32> written) {
+        static const bool enabled = std::getenv("EDEN_NX2_RELEASE_VERIFY") != nullptr;
+        if (!enabled) {
+            return;
+        }
+        static std::atomic<u64> checks{};
+        static std::atomic<u64> mismatches{};
+        static std::atomic<u64> dropped{};
+        const bool missed = !written || *written != predicted;
+        if (!written) {
+            dropped.fetch_add(1, std::memory_order_relaxed);
+        }
+        if (missed && mismatches.fetch_add(1, std::memory_order_relaxed) < 32) {
+            LOG_WARNING(HW_GPU, "Queued release at {:#x}: predicted {:#x}, written {}",
+                        device_address, predicted,
+                        written ? fmt::format("{:#x}", *written) : std::string{"none (dropped)"});
+        }
+        if ((checks.fetch_add(1, std::memory_order_relaxed) + 1) % 4096 == 0) {
+            LOG_INFO(HW_GPU, "Queued release verify: {} checked, {} mismatched ({} dropped)",
+                     checks.load(), mismatches.load(), dropped.load());
+        }
     }
 
     /// Whether a queued, not yet written GPU release meets the acquire.

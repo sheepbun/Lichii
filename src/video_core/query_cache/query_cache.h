@@ -298,12 +298,14 @@ void QueryCacheBase<Traits>::CounterReport(GPUVAddr addr, QueryType counter_type
             bool queued;
             DAddr address;
             u32 value;
+            std::optional<u32> written;
             ~Retire() {
                 if (queued) {
+                    Tegra::Nx2SemaphoreWaiters::Verify(address, value, written);
                     Tegra::Nx2SemaphoreWaiters::Get().OnRetired(address, value);
                 }
             }
-        } const retire{queued_release, cpu_addr, payload};
+        } retire{queued_release, cpu_addr, payload, std::nullopt};
         if (True(query_base->flags & QueryFlagBits::IsInvalidated)) {
             if (const u64 trace = QueryTrace::Sample(QueryTrace::Event::Discard)) {
                 LOG_INFO(HW_GPU,
@@ -339,6 +341,7 @@ void QueryCacheBase<Traits>::CounterReport(GPUVAddr addr, QueryType counter_type
             std::memcpy(pointer, &value, sizeof(value));
         }
         Tegra::Nx2SemaphoreWaiters::Get().OnWrite(cpu_addr, static_cast<u32>(query_base->value));
+        retire.written = static_cast<u32>(query_base->value);
         if (const u64 trace = QueryTrace::Sample(QueryTrace::Event::Write)) {
             const bool wide = True(query_base->flags & QueryFlagBits::HasTimestamp);
             LOG_INFO(HW_GPU,

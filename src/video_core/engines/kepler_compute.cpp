@@ -67,8 +67,9 @@ QueuedRelease QueueRelease(MemoryManager& memory, GPUVAddr address, Reduce&& red
     return {*device, value, true};
 }
 
-void RetireRelease(const QueuedRelease& release) {
+void RetireRelease(const QueuedRelease& release, u32 written) {
     if (release.queued) {
+        Nx2SemaphoreWaiters::Verify(release.device, release.value, written);
         Nx2SemaphoreWaiters::Get().OnRetired(release.device, release.value);
     }
 }
@@ -152,9 +153,10 @@ void KeplerCompute::ProcessNativeReportSemaphore(u32 argument) {
             return ReduceSemaphore(reduction, false, base, payload);
         });
         rasterizer->SignalFence([this, address, payload, reduction, queued] {
-            memory_manager.Write<u32>(address, ReduceSemaphore(reduction, false,
-                                                               memory_manager.Read<u32>(address), payload));
-            RetireRelease(queued);
+            const u32 value =
+                ReduceSemaphore(reduction, false, memory_manager.Read<u32>(address), payload);
+            memory_manager.Write<u32>(address, value);
+            RetireRelease(queued, value);
         });
         return;
     }
@@ -417,7 +419,7 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                         if (const auto device = memory_manager.GpuToCpuAddress(address)) {
                             Tegra::Nx2SemaphoreWaiters::Get().OnWrite(*device, value);
                         }
-                        RetireRelease(queued);
+                        RetireRelease(queued, value);
                         static const u64 watch = [] {
                             const char* text = std::getenv("EDEN_NX2_SEM_WATCH");
                             return text ? u64{std::strtoull(text, nullptr, 16)} : u64{};
@@ -445,7 +447,7 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                         if (const auto device = memory_manager.GpuToCpuAddress(address)) {
                             Tegra::Nx2SemaphoreWaiters::Get().OnWrite(*device, value);
                         }
-                        RetireRelease(queued);
+                        RetireRelease(queued, value);
                     });
                 } else {
                     static const u64 watch = [] {
