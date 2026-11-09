@@ -12,6 +12,7 @@
 
 #include <boost/icl/interval_set.hpp>
 #include "common/assert.h"
+#include "common/jit_stats.h"
 #include "dynarmic/common/fp/fpcr.h"
 #include "dynarmic/common/llvm_disassemble.h"
 #include <bit>
@@ -104,6 +105,7 @@ public:
     void ClearCache() {
         std::unique_lock lock{invalidation_mutex};
         invalidate_entire_cache = true;
+        ::Common::JitStats::full_clears.fetch_add(1, std::memory_order_relaxed);
         HaltExecution(HaltReason::CacheInvalidation);
     }
 
@@ -112,6 +114,7 @@ public:
         const auto end_address = static_cast<u64>(start_address + length - 1);
         const auto range = boost::icl::discrete_interval<u64>::closed(start_address, end_address);
         invalid_cache_ranges.add(range);
+        ::Common::JitStats::range_invalidations.fetch_add(1, std::memory_order_relaxed);
         HaltExecution(HaltReason::CacheInvalidation);
     }
 
@@ -249,11 +252,13 @@ private:
         if (block_of_code.SpaceRemaining() < MINIMUM_REMAINING_CODESIZE) {
             // Immediately evacuate cache
             invalidate_entire_cache = true;
+            ::Common::JitStats::full_clears.fetch_add(1, std::memory_order_relaxed);
             PerformRequestedCacheInvalidation(HaltReason::CacheInvalidation);
         }
         block_of_code.EnsureMemoryCommitted(MINIMUM_REMAINING_CODESIZE);
 
         // JIT Compile
+        ::Common::JitStats::blocks_compiled.fetch_add(1, std::memory_order_relaxed);
         const auto get_code = [this](u64 vaddr) { return conf.callbacks->MemoryReadCode(vaddr); };
         // LocationDescriptor ctor() does important ops (like tflags) do not skip
         auto const arch_descriptor = A64::LocationDescriptor{descriptor};

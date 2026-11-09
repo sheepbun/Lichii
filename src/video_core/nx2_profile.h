@@ -16,6 +16,7 @@
 #include <unordered_set>
 
 #include "common/common_types.h"
+#include "common/jit_stats.h"
 #include "video_core/gpu_split.h"
 #include "common/logging.h"
 #include "common/cpu_features.h"
@@ -303,6 +304,21 @@ inline void Report(const char* thread_name = "GPU thread") {
                             static_cast<double>(window) / 1e6);
     }
     LOG_INFO(HW_GPU, "{} per second:{}", thread_name, line);
+    {
+        namespace Jit = Common::JitStats;
+        const auto per_s = [window](std::atomic<u64>& counter) {
+            return static_cast<double>(counter.exchange(0, std::memory_order_relaxed)) * 1e9 /
+                   window;
+        };
+        const double compiled = per_s(Jit::blocks_compiled);
+        const double ranges = per_s(Jit::range_invalidations);
+        const double clears = per_s(Jit::full_clears);
+        if (compiled + ranges + clears > 0) {
+            LOG_INFO(HW_GPU, "CPU JIT per second: {:.0f} blocks compiled, {:.0f} range invalidations, "
+                             "{:.1f} full clears",
+                     compiled, ranges, clears);
+        }
+    }
     if (const std::string methods = TopMethods(t_method_count, &t_method_same, window); !methods.empty()) {
         LOG_INFO(HW_GPU, "{} methods per second:{}", thread_name, methods);
     }
