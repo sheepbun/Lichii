@@ -19,19 +19,19 @@ Everything here is off unless its variable is set:
 
 ## Running it
 
-1. Start `lichii.exe` (Qt) or `eden-cli.exe` with `EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545` in
-   the environment and boot a game. The log (`%APPDATA%\lichii\log\eden_log.txt`, or `user\log\`
-   next to the exe for portable builds) shows `Debug server listening on 127.0.0.1:6545, dump dir
-   ...`. The default dump directory is the `debug-server` folder in that log folder.
-2. Run the adapter with native Windows Python (`py`). The MSYS `python` in Git Bash rejects `C:/`
-   paths. `--call` runs one request, prints its JSON result and saves any PNG to `--out`:
+1. Start `build/bin/lichii` (Qt) or `build/bin/eden-cli` with `EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545`
+   in the environment and boot a game. The log (`~/.local/share/eglantine/log/eden_log.txt`)
+   shows `Debug server listening on 127.0.0.1:6545, dump dir ...`. The default dump directory is
+   the `debug-server` folder in that log folder.
+2. Run the adapter from the repository root. `--call` runs one request, prints its JSON result and
+   saves any PNG to `--out`:
 
    ```
-   py -I tools/nx2/debug_mcp.py --server 127.0.0.1:6545 --call '{"method":"status"}'
-   py -I tools/nx2/debug_mcp.py --call '{"method":"screenshot","params":{"height":1080}}' --out shot.png
-   py -I tools/nx2/debug_mcp.py --call '{"method":"reject_shaders","params":{"hashes":["3ddfb1d7621c4755"]}}'
-   py -I tools/nx2/debug_mcp.py --call '{"method":"capture_frame","params":{"buffers":true}}'
-   py -I tools/nx2/debug_mcp.py --call '{"method":"input_sequence","params":{"steps":[{"right_stick":[1,0],"frames":60},{"frames":30}]}}'
+   python3 -I tools/nx2/debug_mcp.py --server 127.0.0.1:6545 --call '{"method":"status"}'
+   python3 -I tools/nx2/debug_mcp.py --call '{"method":"screenshot","params":{"height":1080}}' --out shot.png
+   python3 -I tools/nx2/debug_mcp.py --call '{"method":"reject_shaders","params":{"hashes":["3ddfb1d7621c4755"]}}'
+   python3 -I tools/nx2/debug_mcp.py --call '{"method":"capture_frame","params":{"buffers":true}}'
+   python3 -I tools/nx2/debug_mcp.py --call '{"method":"input_sequence","params":{"steps":[{"right_stick":[1,0],"frames":60},{"frames":30}]}}'
    ```
 
    `--server` defaults to `LICHII_DEBUG_SERVER`, then `EDEN_NX2_DEBUG_SERVER`, then

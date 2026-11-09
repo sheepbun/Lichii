@@ -8,13 +8,12 @@ This contains documentation created by developers, build instructions, guideline
 
 - **[General Build Instructions](./Build.md)**
 - **[CMake Options](./Options.md)**
-- **[Cross Compiling](./CrossCompile.md)**
 - **[Development Guidelines](./Development.md)**
 - **[Dependencies](./Deps.md)**
 - **[Debug Guidelines](./Debug.md)**
   - **[RenderDoc](./Debug.md#renderdoc)**
 - **[CPM - CMake Package Manager](./CPMUtil.md)**
-- **[Platform-Specific Caveats](./Caveats.md)**
+- **[Caveats](./Caveats.md)**
 - **[The NVIDIA SM86 (Maxwell) GPU](./NvidiaGpu.md)**
 - **[AMD GPUs and Switch 2 titles](./nx2/amd.md)**
 - **[Driver Bugs](./DriverBugs.md)**

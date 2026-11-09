@@ -6,11 +6,7 @@ To change these options, add `-DOPTION_NAME=NEWVALUE` to the command line.
 
 Notes:
 
-- Defaults are marked per-platform.
-- "Non-UNIX" just means Windows/MSVC and Android (yes, macOS is UNIX
-- Android generally doesn't need to change anything; if you do, go to `src/android/app/build.gradle.kts`
 - To set a boolean variable to on, use `ON` for the value; to turn it off, use `OFF`
-- If a variable is mentioned as being e.g. "ON" for a specific platform(s), that means it is defaulted to OFF on others
 - TYPE is always boolean unless otherwise specified
 - Format:
   - `OPTION_NAME` (TYPE DEFAULT) DESCRIPTION
@@ -21,15 +17,10 @@ Notes:
 
 These options control dependencies.
 
-- `YUZU_USE_BUNDLED_FFMPEG` (ON for non-UNIX) Download a pre-built and configured FFmpeg
-- `YUZU_USE_EXTERNAL_FFMPEG` (ON for Solaris) Build FFmpeg from source
-- `YUZU_DOWNLOAD_ANDROID_VVL` (ON) Download validation layer binary for Android
 - `YUZU_DOWNLOAD_TIME_ZONE_DATA` (ON) Always download time zone binaries
   - Currently, build fails without this
 - `YUZU_TZDB_PATH` (string) Path to a pre-downloaded timezone database (useful for nixOS and Gentoo)
-- `YUZU_USE_BUNDLED_MOLTENVK` (ON, macOS only) Download bundled MoltenVK lib
-- `YUZU_USE_BUNDLED_OPENSSL` (ON for MSVC, Android, Solaris, and OpenBSD) Download bundled OpenSSL build
-- `YUZU_USE_BUNDLED_SDL3` (ON for MSVC) Download a prebuilt SDL3
+- `YUZU_USE_BUNDLED_SDL3` (OFF) Download a prebuilt SDL3
 
 ### Miscellaneous
 
@@ -39,13 +30,10 @@ These options control dependencies.
   - This option is subject for removal.
 - `YUZU_TESTS` (ON) Compile tests - requires Catch2
 - `ENABLE_LTO` (OFF) Enable link-time optimization
-  - Not recommended on Windows
-  - UNIX may be better off appending `-flto=thin` to compiler args
+  - You may be better off appending `-flto=thin` to compiler args
 - `USE_FASTER_LINKER` (OFF) Check if a faster linker is available
-  - Not recommended outside of Linux
 - `YUZU_INSTALL_UDEV_RULES` (OFF) Install udev rules to enable hidraw access
   - Needed for gyroscopes
-  - Only available on Linux
 - `ENABLE_DEBUG_TOOLS` (OFF) Enables debugging and development tools, see [tools](../tools/README.md).
 - `ENABLE_WERROR` (ON) Enables warnings as errors (-Werror).
 
@@ -57,10 +45,9 @@ These options control executables and build flavors.
 - `NIGHTLY_BUILD` (OFF): This is only used by CI. Do not use this unless you're making your own distribution and know what you're doing.
 - `YUZU_STATIC_BUILD` (OFF) Attempt to build using static libraries if possible
   - Not supported on Linux
-  - Automatically set if `YUZU_USE_BUNDLED_QT` is on for non-Linux
 - `ENABLE_UPDATE_CHECKER` (OFF) Enable update checking functionality
   - `LICHII_BUILD_TAG` (empty) Published `build-N` tag. Builds without it never check for updates.
-  - `LICHII_BUILD_PLATFORM` (empty) Release asset platform and variant, such as `linux-x86_64-pgo`. CI sets this from its build matrix.
+  - `LICHII_BUILD_PLATFORM` (empty) Release asset platform and variant, `linux-x86_64` or `linux-x86_64-pgo`. CI sets this from its build matrix.
 - `YUZU_DISABLE_LLVM` (OFF) Do not attempt to link to the LLVM demangler
   - Really only useful for CI or distribution builds
 
@@ -69,8 +56,6 @@ These options control executables and build flavors.
 - `YUZU_CMD` (ON) Compile the SDL-based frontend (eden-cli)
 - `YUZU_ROOM` (OFF) Compile dedicated room functionality into the main executable
 - `YUZU_ROOM_STANDALONE` (OFF) Compile a separate executable for room functionality
-- `YUZU_STATIC_ROOM` (OFF) Compile the room executable *only* as a static, portable executable
-  - This is only usable on Alpine Linux.
 
 ### Desktop
 
@@ -78,7 +63,6 @@ The following options are desktop only.
 
 - `ENABLE_LIBUSB` (ON) Enable the use of the libusb input backend (HIGHLY RECOMMENDED)
 - `ENABLE_OPENGL` (ON) Enable the OpenGL graphics backend
-  - Unavailable on Windows/ARM64 and on Android
   - You probably shouldn't turn this off.
 
 ### Qt
@@ -87,8 +71,8 @@ Also desktop-only, but apply strictly to Qt
 
 - `ENABLE_QT` (ON) Enable the Qt frontend (recommended)
 - `ENABLE_QT_TRANSLATION` (OFF) Enable translations for the Qt frontend
-- `YUZU_USE_BUNDLED_QT` (ON for MSVC) Download bundled Qt binaries
-  - Not recommended on Linux. For Windows and macOS, the provided build is statically linked.
+- `YUZU_USE_BUNDLED_QT` (OFF) Download bundled Qt binaries
+  - Not recommended; use the system Qt.
 - `YUZU_QT_MIRROR` (string) What mirror to use for downloading the bundled Qt libraries
 - `YUZU_USE_QT_MULTIMEDIA` (OFF) Use QtMultimedia for camera support
 - `YUZU_USE_QT_WEB_ENGINE` (OFF) Use QtWebEngine for web applet implementation (requires the huge QtWebEngine dependency; not recommended)
