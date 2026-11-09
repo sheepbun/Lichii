@@ -407,3 +407,18 @@ through a compiler launcher; LTO reports a pre-existing Boost.System ODR mismatc
 (error-category vtables) that the normal link also resolves arbitrarily. Installed as
 `lichii-custom 125.r3` from `.cache/build-pgo`; recipe in `.cache/P5/` (`train.sh`) and
 `.cache/pkg/PKGBUILD`. Profiles go stale as code changes: retrain after rebasing.
+
+## P5-05: running a frame ahead (measured, not shippable as is)
+
+`EDEN_NX2_FRAMES_AHEAD=1` on the PGO build: still 40.5/40.2 vs 35.4/33.7 FPS, panning
+38.6/37.6 vs 33.8/32.6 (+15%), with the known one-frame flashes. The late-read check finds
+the GPU threads reading data the game already rewrote through buffer uploads
+(`MappedUploadMemory`), CPU-write inlining (`WriteMemory`), uniform binds and the query and
+semaphore counters at device pages `0x2b000` and `0x86000`.
+
+A write guard (present returns early, a guest write that faults on GPU-tracked memory waits
+for the frame's fence; `.cache/P5/write-guard-prototype.patch`) recovers nothing: 31.1 vs
+30.4 FPS. Each frame about five such writes waited ~15 ms each, i.e. the game writes tracked
+memory right after the present returns. Overlap therefore needs copy-on-write snapshots of the
+pages written during the window, with the GPU threads' reads for the earlier frame redirected
+to them (device reads, `GetPointer` users included), not a wait.
