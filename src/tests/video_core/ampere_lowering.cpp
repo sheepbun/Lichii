@@ -296,10 +296,13 @@ TEST_CASE("Ampere gathers take arrays, per-pixel offsets and depth references",
     const auto per_pixel = lower({{0x06189b63, 0x30007c10, 0x001e2f0e, 0x000f4600}});
     INFO(per_pixel.error);
     REQUIRE(static_cast<bool>(per_pixel));
+    // Lichii puts the offsets in R248, R249 (where proven constants go) before the coordinates.
     REQUIRE(per_pixel.instructions.size() >= 5);
-    CHECK(field(per_pixel.instructions[2], 20, 8) == 16);
-    CHECK(field(per_pixel.instructions[3], 20, 8) == 17);
-    CHECK(field(per_pixel.instructions[4], 20, 8) == 246);
+    CHECK(field(per_pixel.instructions[0], 0, 8) == 248);
+    CHECK(field(per_pixel.instructions[0], 20, 8) == 16);
+    CHECK(field(per_pixel.instructions[1], 0, 8) == 249);
+    CHECK(field(per_pixel.instructions[1], 20, 8) == 17);
+    CHECK(field(per_pixel.instructions[4], 20, 8) == 248);
     CHECK(field(per_pixel.instructions[4], 28, 3) == 2);
     CHECK(field(per_pixel.instructions[4], 54, 2) == 2);
 
