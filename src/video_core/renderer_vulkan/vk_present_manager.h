@@ -43,6 +43,9 @@ struct Frame {
     /// thread shows a batch's first frame at once and each later one present_offset after it.
     bool batch_start{true};
     std::chrono::nanoseconds present_offset{};
+    /// The game's own frame, not a generated one (EDEN_DKB_FRAME_TRACE latency).
+    bool real{true};
+    std::chrono::steady_clock::time_point queued{};
 };
 
 class PresentManager {
@@ -116,6 +119,19 @@ private:
     std::atomic<std::size_t> image_count{};
     std::atomic<u32> queued_batches{};
     std::chrono::steady_clock::time_point batch_anchor{};
+
+    // EDEN_DKB_FRAME_TRACE: present thread time per second.
+    struct PresentTrace {
+        std::chrono::steady_clock::time_point next{};
+        u32 presents{};
+        double hold_ms{};
+        double acquire_ms{};
+        double acquire_max_ms{};
+        double submit_present_ms{};
+        u32 real_presents{};
+        double real_delay_ms{};
+        double real_delay_max_ms{};
+    } present_trace;
     std::atomic<std::size_t> swapchain_image_count{};
     std::atomic<VkFormat> swapchain_image_format{};
 };

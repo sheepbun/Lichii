@@ -6,6 +6,8 @@
 
 #include <chrono>
 
+#include "common/dkb_frame_trace.h"
+#include "common/logging.h"
 #include "common/settings.h"
 #include "common/thread.h"
 #include "core/core.h"
@@ -188,12 +190,16 @@ Frame* PresentManager::GetRenderFrame() {
 
     frame->batch_start = true;
     frame->present_offset = {};
+    frame->real = true;
     return frame;
 }
 
 void PresentManager::Present(Frame* frame) {
     if (use_present_thread) {
         scheduler.Record([this, frame](vk::CommandBuffer) {
+            if (Common::DkbFrameTrace::Enabled()) {
+                frame->queued = std::chrono::steady_clock::now();
+            }
             std::unique_lock lock{queue_mutex};
             if (frame->batch_start) {
                 queued_batches.fetch_add(1, std::memory_order_relaxed);
@@ -353,7 +359,15 @@ void PresentManager::PresentThread(std::stop_token token) {
             // before the queue lock goes out of scope. This way the swapchain
             // lock in WaitPresent is guaranteed to occur after here.
             void(std::exchange(lock, std::unique_lock{swapchain_mutex}));
+            const bool trace = Common::DkbFrameTrace::Enabled();
+            const auto hold_start = trace ? std::chrono::steady_clock::now()
+                                          : std::chrono::steady_clock::time_point{};
             HoldForBatch(frame, token);
+            if (trace) {
+                present_trace.hold_ms += std::chrono::duration<double, std::milli>(
+                                             std::chrono::steady_clock::now() - hold_start)
+                                             .count();
+            }
             CopyToSwapchain(frame);
 
             // Free the frame for reuse
@@ -469,9 +483,14 @@ void PresentManager::CopyToSwapchainImpl(Frame* frame) {
         return;
     }
 
+    const bool trace = Common::DkbFrameTrace::Enabled();
+    const auto acquire_start = trace ? std::chrono::steady_clock::now()
+                                     : std::chrono::steady_clock::time_point{};
     while (swapchain.AcquireNextImage(!use_present_thread)) {
         RecreateSwapchain(frame);
     }
+    const auto acquired = trace ? std::chrono::steady_clock::now()
+                                : std::chrono::steady_clock::time_point{};
 
     const vk::CommandBuffer cmdbuf{frame->cmdbuf};
     cmdbuf.Begin({
@@ -618,6 +637,37 @@ void PresentManager::CopyToSwapchainImpl(Frame* frame) {
 
     // Present
     swapchain.Present(render_semaphore);
+    if (trace) {
+        const auto now = std::chrono::steady_clock::now();
+        const auto ms = [](auto duration) {
+            return std::chrono::duration<double, std::milli>(duration).count();
+        };
+        PresentTrace& t = present_trace;
+        ++t.presents;
+        t.acquire_ms += ms(acquired - acquire_start);
+        t.acquire_max_ms = (std::max)(t.acquire_max_ms, ms(acquired - acquire_start));
+        t.submit_present_ms += ms(now - acquired);
+        if (frame->real) {
+            // From the worker queueing the game's frame to its present call: the delay frame
+            // generation adds before it is shown (FIFO's queue comes on top).
+            ++t.real_presents;
+            t.real_delay_ms += ms(now - frame->queued);
+            t.real_delay_max_ms = (std::max)(t.real_delay_max_ms, ms(now - frame->queued));
+        }
+        if (now >= t.next) {
+            if (t.next != std::chrono::steady_clock::time_point{}) {
+                LOG_INFO(Render_Vulkan,
+                         "DKB present_thread presents={} hold_ms={:.1f} acquire_ms={:.1f} "
+                         "acquire_max_ms={:.2f} submit_present_ms={:.1f} real_presents={} "
+                         "real_delay_avg_ms={:.1f} real_delay_max_ms={:.1f}",
+                         t.presents, t.hold_ms, t.acquire_ms, t.acquire_max_ms,
+                         t.submit_present_ms, t.real_presents,
+                         t.real_presents ? t.real_delay_ms / t.real_presents : 0.0,
+                         t.real_delay_max_ms);
+            }
+            t = PresentTrace{.next = now + std::chrono::seconds{1}};
+        }
+    }
     if (Core::g_nx2_present_time_services.load(std::memory_order_relaxed) != 0) {
         const u64 present =
             Core::g_nx2_host_present_count.fetch_add(1, std::memory_order_relaxed) + 1;
