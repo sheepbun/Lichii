@@ -69,7 +69,8 @@ TEST_CASE("Yoshi captured SURED uses a buffer coordinate and descriptor", "[ampe
                   (0xeb48002000000506ULL | (u64{guard} << 16) | (u64{dimension} << 33)));
         }
     }
-    for (const u32 dimension : {0U, 2U, 4U, 5U, 6U, 7U}) {
+    // 3D (5) is lowered too, for ADD and OR (Star Fox, upstream 587633debe).
+    for (const u32 dimension : {0U, 2U, 4U, 6U, 7U}) {
         auto instruction = Reduction;
         instruction.words[1] = (instruction.words[1] & 0x1fffffffU) | (dimension << 29);
         REQUIRE_FALSE(LowerToMaxwell(std::array{instruction, Exit}));
