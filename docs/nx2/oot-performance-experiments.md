@@ -75,9 +75,10 @@ Results (FG off, High accuracy, unchanged settings):
 The two candidate gameplay runs beat both baseline runs (about 3% gain in mean
 FPS across the pairs). The fixed-field pair supports the direction but its p99
 was worse, so this is not a proven improvement in every tail metric. The six
-runs are a small sample, not evidence across all scenes. No shader builds or
-held draws occurred in their gameplay windows. The first `C4_a_base` run was
-excluded after drive failure. Fixed-view screenshots show the same scene and no
+runs are a small sample, not evidence across all scenes. The fixed-view windows
+had no runtime pipeline builds. Pan/walk windows built 70–92 pipelines; none
+reported held draws. The first `C4_a_base` run was
+excluded after another worker accidentally terminated its process during startup. Fixed-view screenshots show the same scene and no
 obvious visual regression; animation differs. All 1040 existing test cases passed.
 The interrupted assistant turn did not interrupt `C4_f_static_aligned`; its
 normal completion and cleanup were recovered.
@@ -104,3 +105,58 @@ memory-reading macros on the back. It needs effect analysis, register ownership
 tracking and APIs absent here; evaluate as a separate substantial port.
 Origin PR 1032 skips some waits and query flushes, but explicitly acknowledges
 unresolved stale-query correctness. Do not adopt that shortcut.
+
+The metrics implementation passes 289 assertions in 18 debug-server test cases.
+`C4_g_metrics_base` is a live smoke check, not a comparison run: its first launch
+omitted the beside-binary switch file. Logged settings match the earlier runs,
+and split/fence defaults match the file, but subsequent baseline and candidate
+packages carry byte-identical copies explicitly. It reported full-window lows
+successfully. Benchmark wrappers now reject mismatched switch files and preserve
+binary hashes before launching.
+
+C4-03 candidate ports `26aad9dc55b02218e15e6652afa4471c89cc3995` from
+`origin/egla91/back-macros-nx2`, leaving narrower-wait and asynchronous-readback
+prerequisites out. It copies macro arguments into the command ring; runs only
+statically classified FIFO-reading, non-data-RAM macros on the back; and tracks
+back-owned registers/shadow values until the front needs them. Other DMA reads
+retain full draining and query flushing. Source attribution and source tests
+are preserved. The differential-write diagnostic from `f04151ff36` is parked
+in `.cache/C4/backmacro-verify.patch` for a separate validation build.
+
+The port passed 1046 test cases (including new effect-analysis and register-
+ownership cases). Gameplay runs `C4_i_backmacros` and `C4_j_backmacros` measured
+30.545 and 30.396 FPS, against `C4_h_macro_base` at 30.010 FPS. The candidate's
+1% lows were 13.445 and 12.852 FPS, versus 13.323 FPS for that baseline. This
+small sample does not yet establish a gain worth the substantial port. The
+reverse baseline `C4_k_macro_base` measured 27.427 FPS while another worker ran
+large DWARF `perf report` processing outside the lab lock; exclude it from the
+comparison and repeat under quiet conditions. The cause of its slowdown is not
+proven, but the run violates isolation.
+
+The port is parked, not integrated. Its complete patch, including its added
+test file, is `.cache/C4/backmacros-candidate.patch` (apply-checked against
+`f67125787d`), with an immutable binary in `.cache/C4/backmacros/`. No runtime
+register escape, MME failure or device loss was seen in the two candidate runs;
+this does not replace differential correctness validation. Preserve the port
+for testing against faster GPUBack implementations.
+
+## C4-04: one macro DMA handoff (investigating)
+
+The current front path fully drains the back, then makes another synchronous
+back request for query flushing, plus a separate request when buffer data is
+dirty. Hypothesis: combining these into one ordered `GpuSplit::Run` removes a
+round trip and an idle transition at each DMA read. Unlike a narrower dependency
+wait, it still executes after every earlier entry and completes both cache
+flushes before reading memory on the front.
+
+Candidate changes only `FrontDmaRead`: trace pending queries, test and flush
+buffer dirtiness, then flush query reports, in one back callback. Preserve the
+buffer-before-query ordering and per-word memory reads. `Run` already ends with
+a full `Drain`, including the back's idle hook; the caller waits for exactly
+that completion. No skip-flush switch or early read is introduced. The existing
+upstream narrower-wait implementation (`55601ecbbe`) and the earlier unsafe-read
+quarantine (`1bb45da83d`) were inspected; neither supplies this smaller change.
+
+Builds and heavy profile processing now share the benchmark lock. C4's wrapper
+also records CPU frequencies, available memory and interfering compiler/perf
+processes every two seconds, rejecting runs with detected interference.
