@@ -426,3 +426,16 @@ for the frame's fence; `.cache/P5/write-guard-prototype.patch`) recovers nothing
 memory right after the present returns. Overlap therefore needs copy-on-write snapshots of the
 pages written during the window, with the GPU threads' reads for the earlier frame redirected
 to them (device reads, `GetPointer` users included), not a wait.
+
+## P5-06: running ahead with snapshots of pending pages (rejected)
+
+`.cache/P5/ahead-safe-experiment.patch` (`EDEN_NX2_AHEAD_SAFE=1`): at an early present GPUBack
+copied every page its buffers held CPU-modified, a write to clean tracked memory copied its page
+first and was held back until the front reached the next frame's command lists, and GPUBack's
+device reads of copied pages read the copies. It copied ~10,000-12,500 pages (40-50 MB) in
+7-10 ms per frame and redirected ~8,500 reads. Panning fell to 19-22 FPS with p99 ~220 ms, and
+frames still broke: white screens, missing grass, smeared ground. A first version that uploaded
+all CPU-modified buffer ranges instead of copying them re-protected pages the game rewrites
+every frame (~600 write faults per frame) and fell to 25-27 FPS. Running ahead stays off for
+Ocarina; the remaining late reads (query/semaphore words, QMDs, image uploads) and the volume of
+CPU-modified memory make it a much larger change than this.
