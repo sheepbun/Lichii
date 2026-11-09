@@ -975,6 +975,7 @@ void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading
     if (title_id == 0) {
         return;
     }
+    const auto load_begin = std::chrono::steady_clock::now();
     if (!pipeline_cache_filename.empty()) {
         background_pipelines.Stop();
         workers.WaitForRequests();
@@ -1265,6 +1266,8 @@ void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading
     state_lock.unlock();
 
     workers.WaitForRequests(stop_loading);
+    LOG_INFO(Render_Vulkan, "Disk pipelines built {:.1f} s after the load began",
+             std::chrono::duration<double>(std::chrono::steady_clock::now() - load_begin).count());
 
     AddIncompleteGraphics(state.incomplete_graphics, graphics_duplicates, disk_pipelines,
                           state.incomplete);

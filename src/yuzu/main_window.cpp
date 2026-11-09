@@ -2106,27 +2106,6 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
     }
     PrepareShaderPrecache(title_id, std::filesystem::path{filename.toStdU16String()});
 
-    if (title_id == Settings::OcarinaOfTimeProgramId && !asked_recommended_oot_settings) {
-        asked_recommended_oot_settings = true;
-        use_recommended_oot_settings =
-            QMessageBox::question(
-                this, tr("Recommended Ocarina of Time settings"),
-                tr("Use the recommended settings for Ocarina of Time?\n\n"
-                   "Vulkan, 1x resolution, GPU Fast, asynchronous shaders, BC3, conservative VRAM, "
-                   "reactive flushing on, FIFO Relaxed VSync, docked mode, ScaleForce, and "
-                   "FXAA.\n\n"
-                   "They apply to Ocarina of Time until Eglantine is closed. Your saved settings "
-                   "are not changed."),
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes;
-        LOG_INFO(Config, "OOT recommended settings accepted: {}", use_recommended_oot_settings);
-    }
-    if (Settings::ApplyOcarinaOfTimePreset(Settings::values, title_id,
-                                           use_recommended_oot_settings)) {
-        QtCommon::system->ApplySettings();
-        Settings::UpdateGPUAccuracy();
-        LOG_INFO(Config, "Applied recommended OOT settings after per-game configuration");
-    }
-
     Settings::LogSettings();
 
     if (UISettings::values.select_user_on_boot && !user_flag_cmd_line) {
