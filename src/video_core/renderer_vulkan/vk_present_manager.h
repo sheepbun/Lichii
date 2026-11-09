@@ -7,6 +7,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <boost/container/deque.hpp>
@@ -38,6 +39,10 @@ struct Frame {
     vk::Semaphore render_ready;
     vk::Fence present_done;
     bool storage_capable{};
+    /// Frames generated for one real frame and the real frame itself form a batch. The present
+    /// thread shows a batch's first frame at once and each later one present_offset after it.
+    bool batch_start{true};
+    std::chrono::nanoseconds present_offset{};
 };
 
 class PresentManager {
@@ -75,6 +80,8 @@ public:
 private:
     void PresentThread(std::stop_token token);
 
+    void HoldForBatch(Frame* frame, std::stop_token token);
+
     void CopyToSwapchain(Frame* frame);
 
     void CopyToSwapchainImpl(Frame* frame);
@@ -107,6 +114,8 @@ private:
     bool storage_supported;
     bool use_present_thread;
     std::atomic<std::size_t> image_count{};
+    std::atomic<u32> queued_batches{};
+    std::chrono::steady_clock::time_point batch_anchor{};
     std::atomic<std::size_t> swapchain_image_count{};
     std::atomic<VkFormat> swapchain_image_format{};
 };

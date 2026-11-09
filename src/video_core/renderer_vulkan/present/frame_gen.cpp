@@ -297,6 +297,17 @@ size_t FrameGen::GeneratedFrameCount() const {
     return generated ? last_generations : 0;
 }
 
+std::chrono::nanoseconds FrameGen::OutputSpacing() const {
+    const size_t outputs = GeneratedFrameCount() + 1;
+    if (outputs == 1) {
+        return {};
+    }
+    // Leave room for the next game frame arriving a little early.
+    constexpr f32 MARGIN = 0.9f;
+    const f32 seconds = pacer.SmoothedInterval() * MARGIN / static_cast<f32>(outputs);
+    return std::chrono::nanoseconds{static_cast<s64>(seconds * 1e9f)};
+}
+
 void FrameGen::GenerateInto(const Device& device, Frame* destination, size_t generation) {
     const bool use_fsr3 = Settings::values.frame_gen_type.GetValue() == Settings::FrameGenType::Fsr3;
 

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <optional>
 
 #include "common/common_types.h"
@@ -30,6 +31,10 @@ public:
     [[nodiscard]] size_t WantedGenerations(size_t capacity);
 
     [[nodiscard]] size_t GeneratedFrameCount() const;
+
+    /// How far apart to show this real frame's outputs: the game's frame interval spread evenly
+    /// over them, or zero to show them as fast as the swapchain takes them.
+    [[nodiscard]] std::chrono::nanoseconds OutputSpacing() const;
 
     void GenerateInto(const Device& device, Frame* destination, size_t generation);
 

@@ -186,6 +186,8 @@ Frame* PresentManager::GetRenderFrame() {
     frame->present_done.Wait();
     frame->present_done.Reset();
 
+    frame->batch_start = true;
+    frame->present_offset = {};
     return frame;
 }
 
@@ -193,6 +195,9 @@ void PresentManager::Present(Frame* frame) {
     if (use_present_thread) {
         scheduler.Record([this, frame](vk::CommandBuffer) {
             std::unique_lock lock{queue_mutex};
+            if (frame->batch_start) {
+                queued_batches.fetch_add(1, std::memory_order_relaxed);
+            }
             present_queue.push_back(frame);
             frame_cv.notify_one();
         });
@@ -348,6 +353,7 @@ void PresentManager::PresentThread(std::stop_token token) {
             // before the queue lock goes out of scope. This way the swapchain
             // lock in WaitPresent is guaranteed to occur after here.
             void(std::exchange(lock, std::unique_lock{swapchain_mutex}));
+            HoldForBatch(frame, token);
             CopyToSwapchain(frame);
 
             // Free the frame for reuse
@@ -355,6 +361,26 @@ void PresentManager::PresentThread(std::stop_token token) {
             free_queue.push_back(frame);
             free_cv.notify_one();
         }
+    }
+}
+
+void PresentManager::HoldForBatch(Frame* frame, std::stop_token token) {
+    const auto now = std::chrono::steady_clock::now();
+    if (frame->batch_start) {
+        queued_batches.fetch_sub(1, std::memory_order_relaxed);
+        batch_anchor = now;
+        return;
+    }
+    // A later batch already waiting means this one is behind: show the rest at once.
+    if (queued_batches.load(std::memory_order_relaxed) != 0) {
+        return;
+    }
+    constexpr auto MAX_HOLD = std::chrono::milliseconds{100};
+    const auto target = (std::min)(batch_anchor + frame->present_offset, now + MAX_HOLD);
+    while (!token.stop_requested() && std::chrono::steady_clock::now() < target &&
+           queued_batches.load(std::memory_order_relaxed) == 0) {
+        std::this_thread::sleep_until(
+            (std::min)(target, std::chrono::steady_clock::now() + std::chrono::milliseconds{1}));
     }
 }
 
