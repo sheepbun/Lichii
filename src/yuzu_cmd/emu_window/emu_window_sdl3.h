@@ -48,7 +48,7 @@ public:
     /// Sets the title the titlebar timer prepared; call from the main thread.
     void ApplyPendingTitle();
 
-    /// Titles the window "<game> | <fps> FPS (<speed>%)" instead of the build name.
+    /// Names the game in the title now; the titlebar timer adds FPS from its next tick.
     void SetGameTitle(std::string title);
 
     /// Returns if window is shown (not minimized)
@@ -103,8 +103,8 @@ protected:
     /// Periodic changer of titlebar (independent of event loop)
     SDL_TimerID titlebar_timer;
     std::atomic<std::string*> pending_title{};
-    std::mutex game_title_mutex;
-    std::string game_title;
+    std::mutex game_name_mutex;
+    std::string game_name; ///< Set by SetGameTitle, else by the titlebar timer from GetGameName
 
     // Mouse resetter once it
     SDL_TimerID mouse_timer;
