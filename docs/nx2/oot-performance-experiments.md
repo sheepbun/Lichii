@@ -324,3 +324,32 @@ Pinning (GPUBack to CPU 4, GPU to 5, SMT siblings 12/13 idle, guest cores to
 EPP `performance` gave 32.69 and 31.45. Both together gave a single 34.11.
 Within-run drift (±3%) is as large as any of these, so no code change
 follows; EPP was restored to `balance_performance`.
+
+## C4-08: where the guest threads spend their time (analysis)
+
+`C4_j_guest_oncpu` (`.cache/C4/oncpu.sh`) sampled the six CPUCore threads at
+2 kHz with DWARF stacks for 5 s on the retained build (32.3 FPS during perf).
+Together they were on CPU about 1.13 cores. Of that, 60.5% was JIT guest
+code, about 28% the idle loop spinning (`PhysicalCore::Idle` →
+`sched_yield`, `clock_gettime`) and 26.6% kernel time overall. Host work the
+guest triggers is small. CPU writes to GPU-tracked pages
+(`HandleRasterizerWrite` → `RasterizerVulkan::OnCPUWrite`, contending with the
+back for the rasterizer `SpinRecursiveMutex`) took 2.4%. Re-protecting cached
+pages (`RasterizerMarkRegionCached` → `mprotect`) took about 1.2%, and SVC and
+scheduler emulation about 3%. The guest cores are off CPU about half the time.
+
+Neither guest JIT throughput nor emulator overhead on the guest threads
+bounds the frame. The game's threads and the GPU threads wait on each
+other: render threads release command chunks that suspended channels poll for,
+and present waits for the last chunk. CPU reads of GPU-written memory
+(`TickWork` → `FlushRegion` → `Scheduler::Finish`, about 35 ms/s on the back)
+are another full host-GPU wait the game blocks on, about 1 ms per frame.
+
+Assessment against 170 FPS (5.88 ms): the game CPU phase alone is about 7.7 ms
+per frame, before any GPU-thread work, while OoT must wait for each frame
+(`frames_ahead=0`; running ahead rereads rewritten data). Real 170 FPS is not
+reachable without overlapping that phase with GPU work, which W1 showed
+corrupts frames unless the GPU thread snapshots the data it reads late. The
+remaining measured levers, each at most a few percent: CPU-read downloads
+(about 1 ms per frame), the 50 µs suspended-channel poll, rasterizer lock
+contention from CPU writes, and the back's flat per-draw cost.
