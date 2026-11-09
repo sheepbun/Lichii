@@ -284,12 +284,13 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
     }
 }
 
-size_t FrameGen::WantedGenerations(size_t capacity) {
+size_t FrameGen::WantedGenerations(size_t capacity, size_t available) {
     if (unavailable) {
         plan = {};
         return 0;
     }
     plan = pacer.Plan(capacity);
+    plan.generations = (std::min)(plan.generations, available);
     return plan.generations;
 }
 

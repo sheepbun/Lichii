@@ -28,7 +28,9 @@ public:
 
     void Process(const Device& device, Frame* frame, VkFormat format, VkExtent2D guest_extent);
 
-    [[nodiscard]] size_t WantedGenerations(size_t capacity);
+    /// Plans this game frame's generations for up to capacity frames, then generates into at most
+    /// the available ones.
+    [[nodiscard]] size_t WantedGenerations(size_t capacity, size_t available);
 
     [[nodiscard]] size_t GeneratedFrameCount() const;
 

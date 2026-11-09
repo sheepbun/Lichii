@@ -194,6 +194,11 @@ Frame* PresentManager::GetRenderFrame() {
     return frame;
 }
 
+size_t PresentManager::FreeFrames() {
+    std::scoped_lock lock{free_mutex};
+    return free_queue.size();
+}
+
 void PresentManager::Present(Frame* frame) {
     if (use_present_thread) {
         scheduler.Record([this, frame](vk::CommandBuffer) {
@@ -359,16 +364,28 @@ void PresentManager::PresentThread(std::stop_token token) {
             // before the queue lock goes out of scope. This way the swapchain
             // lock in WaitPresent is guaranteed to occur after here.
             void(std::exchange(lock, std::unique_lock{swapchain_mutex}));
-            const bool trace = Common::DkbFrameTrace::Enabled();
-            const auto hold_start = trace ? std::chrono::steady_clock::now()
-                                          : std::chrono::steady_clock::time_point{};
-            HoldForBatch(frame, token);
-            if (trace) {
-                present_trace.hold_ms += std::chrono::duration<double, std::milli>(
-                                             std::chrono::steady_clock::now() - hold_start)
-                                             .count();
+            // A generated frame with a later batch already queued would only push that batch's
+            // frames (the newer game frame included) back by a refresh each: drop it. Its own
+            // batch's game frame is still shown.
+            const u32 later_batches = queued_batches.load(std::memory_order_relaxed) -
+                                      (frame->batch_start ? 1U : 0U);
+            if (!frame->real && later_batches != 0) {
+                if (frame->batch_start) {
+                    queued_batches.fetch_sub(1, std::memory_order_relaxed);
+                }
+                DiscardFrame(frame);
+            } else {
+                const bool trace = Common::DkbFrameTrace::Enabled();
+                const auto hold_start = trace ? std::chrono::steady_clock::now()
+                                              : std::chrono::steady_clock::time_point{};
+                HoldForBatch(frame, token);
+                if (trace) {
+                    present_trace.hold_ms += std::chrono::duration<double, std::milli>(
+                                                 std::chrono::steady_clock::now() - hold_start)
+                                                 .count();
+                }
+                CopyToSwapchain(frame);
             }
-            CopyToSwapchain(frame);
 
             // Free the frame for reuse
             std::scoped_lock fl{free_mutex};

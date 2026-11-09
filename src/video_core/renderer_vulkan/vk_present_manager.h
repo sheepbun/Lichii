@@ -62,6 +62,9 @@ public:
     /// Returns the last used presentation frame
     Frame* GetRenderFrame();
 
+    /// How many frames GetRenderFrame can return now without waiting for presentation.
+    [[nodiscard]] size_t FreeFrames();
+
     /// Pushes a frame for presentation
     void Present(Frame* frame);
 

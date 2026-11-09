@@ -243,7 +243,11 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                                swapchain.GetImageViewFormat());
 
 #ifdef HAS_LSFG
-    void(frame_gen.WantedGenerations(present_manager.MaxExtraFrames()));
+    // Only into frames free now: waiting here for the swapchain to show older ones held up the
+    // GPU thread and the game with it (Ocarina in Hyrule Field at a 170 FPS target: 25.0 FPS
+    // while panning, 27.2 without the wait).
+    void(frame_gen.WantedGenerations(present_manager.MaxExtraFrames(),
+                                     present_manager.FreeFrames()));
 
     frame_gen.Process(device, frame, present_manager.SwapchainImageFormat(),
                       GuestExtent(framebuffers));
