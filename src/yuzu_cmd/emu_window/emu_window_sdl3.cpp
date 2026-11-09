@@ -41,12 +41,17 @@ EmuWindow_SDL3::EmuWindow_SDL3(InputCommon::InputSubsystem* input_subsystem_, Co
         auto* this_ = (EmuWindow_SDL3*)userdata;
         auto const results = this_->system.GetAndResetPerfStats();
         // The game's name once it has loaded; the build is on the log's first line.
-        if (this_->game_name.empty() &&
-            this_->system.GetGameName(this_->game_name) != Loader::ResultStatus::Success) {
-            this_->game_name.clear();
+        std::string game_name;
+        {
+            std::scoped_lock lock{this_->game_name_mutex};
+            if (this_->game_name.empty() &&
+                this_->system.GetGameName(this_->game_name) != Loader::ResultStatus::Success) {
+                this_->game_name.clear();
+            }
+            game_name = this_->game_name;
         }
         auto* const title = new std::string(fmt::format(
-            "{} | {:.0f} FPS ({:.0f}%)", this_->game_name.empty() ? "Lichii" : this_->game_name,
+            "{} | {:.0f} FPS ({:.0f}%)", game_name.empty() ? "Lichii" : game_name,
             results.average_game_fps, results.emulation_speed * 100.0f));
         // Timers run on their own thread and AppKit throws when a title is set off the main
         // thread: ApplyPendingTitle sets it from the main loop.
@@ -176,6 +181,14 @@ void EmuWindow_SDL3::ApplyPendingTitle() {
         SDL_SetWindowTitle(render_window, title->c_str());
         delete title;
     }
+}
+
+void EmuWindow_SDL3::SetGameTitle(std::string title) {
+    {
+        std::scoped_lock lock{game_name_mutex};
+        game_name = title;
+    }
+    delete pending_title.exchange(new std::string(std::move(title)));
 }
 
 bool EmuWindow_SDL3::IsShown() const {
