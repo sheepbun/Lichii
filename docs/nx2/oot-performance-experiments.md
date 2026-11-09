@@ -176,3 +176,95 @@ excluded: per-page CPU tracking does not cover all aliases and host writers.
 The next investigation is acquire/fence synchronization. Upstream `a4f6287327`
 (PR 949) requires immediate-release settings for its drain-free checks, so
 that fast path is ineligible at the High accuracy used by this mission.
+
+
+## C4-05: acquire and fence handoffs (rejected)
+
+A temporary `EDEN_NX2_ACQUIRE_PROBE` patch preserves all waits and separates
+initial checks, resume polls, legacy acquires and SEM_EXECUTE. The fixed-scene
+run `C4_s_acquire_probe` recorded 23 roughly two-second gameplay windows:
+135672 initial drains / 3535.890 ms, 5253136 resume drains /
+385.481 ms. Only 21403 resumes were already latched before their
+drain, accounting for 39.582 ms. An early-latch return would recover
+less than one millisecond per second here, so do not pursue it first. Probe FPS
+is not a performance comparison. Patch/binary preserved under `.cache/C4/`;
+probe removed from source.
+
+Next isolated candidate: defer the initial failed acquire's `ReleaseFences`
+callback, explicitly publish it, and suspend the channel. The existing resume
+path still fully drains and checks the semaphore; unsplit execution is unchanged.
+This permits scheduler interleaving but adds a suspension and command resnapshot,
+so benchmark it before considering retention. Patch:
+`.cache/C4/defer-fences-candidate.patch`. No experiment flag is integrated.
+
+Result: all 1041 test cases passed, but fixed-view `C4_t_defer_fences`
+measured 28.80 FPS, p99 53.79 ms, 1% low 14.20 FPS and 0.1% low 7.34 FPS,
+against `C4_o_static_base` at 30.71 FPS, 45.49 ms, 19.78 FPS and 16.73 FPS.
+The quiet-host monitor recorded no interference. One run is not a precise
+effect size, but every metric moved the wrong way and the tails by a wide
+margin; the extra suspension and resnapshot cost more than the overlap gains.
+Reverted; patch kept at the path above.
+
+## C4-06: frame critical path and host-GPU waits on the back (investigating)
+
+The present statistics in `C4_o_static_base` (fixed view) split each 32.5 ms
+frame into about 7.7 ms of game CPU work and 24.8 ms blocked in nx2:vi2 229
+waiting for the GPU threads; composite and vblank pacing are about 0 ms. The
+guest syncpoint is incremented when the back processes it, so this wait is the
+GPU threads catching up, not host GPU completion. `W2_h1_trace` shows the back
+idle about 254 ms/s (the game's CPU phase) and an unattributed "other" zone of
+about 252 ms/s. OoT runs at `frames_ahead=0` because running ahead rereads data
+the game has already rewritten (see `nx2_gsv.h`). Each GPU-thread millisecond
+therefore adds directly to the frame.
+
+`C4_u_offcpu` (`.cache/C4/offcpu.sh`, analyzed with `offcpu.py`) recorded
+GPU-thread scheduling with DWARF stacks for 5 s in the fixed view; FPS during
+perf was 30.9, versus 30.6 before. GPUBack was off-CPU 418 ms/s:
+
+| Blocking stack | ms/s | waits/s |
+|---|---:|---:|
+| `RasterizerVulkan::ReleaseFences` (condition variable, host GPU fence) | 227.5 | 1282 |
+| `BackLoop` waiting for work | 164.9 | 663 |
+| `FlushRegion` → `Scheduler::Finish` from `TickWork` (CPU reads of GPU data) | 24.8 | 154 |
+
+The front's largest wait (168 ms/s) is the drain in
+`ProcessSemaphoreTriggerMethod`. A Switch 2 acquire not already met after
+draining calls `ReleaseFences`, i.e. `WaitPendingFences(force)`. That waits
+for the host GPU to finish everything submitted, because at High accuracy a
+fence-flagged payload release writes guest memory (and latches waiters) only
+when its host fence passes. About 1000 acquires per second take this path; only
+about 145 per second actually suspend. Each pays a full host-GPU round trip.
+That is ≈ 7.5 ms per frame on the critical path, and accounts for the "other" zone.
+
+Candidate (queued release): when the back records a payload release whose
+memory write waits for a host fence, register it (`Nx2SemaphoreWaiters::OnQueued`,
+retired when the write runs or is discarded) and latch suspended waiters it
+meets. A Switch 2 acquire not met in memory but met by a queued release then
+continues without `ReleaseFences`. On the back, a `WaitForIdle` barrier keeps the
+channel's later host work behind the release's work. Resuming a suspended
+acquire does the same. CPU-visible semaphore memory is still written only after
+the host fence passes. Patches: `.cache/C4/queued-release-candidate.patch` and
+`queued-release2-candidate.patch`. Binaries: `.cache/C4/queued_release*/`.
+All 1041 test cases passed.
+
+| Run | Switches | FPS | 1% low | p99 ms | Fence wait ms |
+|---|---|---:|---:|---:|---:|
+| C4_v1_off | off | 30.67 | 23.59 | 39.77 | 24.6 |
+| C4_v2_qr | queued release | 32.36 | 25.84 | 37.55 | 22.9 |
+| C4_v3_qrnw | + non-forcing fence-action acquire | 32.14 | 19.80 | 39.83 | 24.2 |
+| C4_v4_off | off | 30.61 | 21.44 | 42.34 | 24.4 |
+| C4_w_site_probe | queued release (site counters) | 32.69 | 22.96 | 37.76 | — |
+| C4_x1_off | off | 31.01 | 18.39 | 42.16 | 24.6 |
+| C4_x2_qr | queued release, latched at queue | 32.36 | 23.18 | 37.91 | 23.9 |
+| C4_x3_qrcp | + non-blocking 1 ms commit poll | 31.98 | 22.24 | 41.12 | 22.8 |
+| C4_x4_off | off | 30.88 | 22.93 | 39.86 | 24.7 |
+
+Queued release averages 32.47 FPS against 30.79 (+5.5%) and improved p99 in
+every pairing. Neither the fence-action no-wait nor the commit poll helped; both
+are dropped. No semaphore-timeout, MME or device-loss warnings appeared.
+Visual correctness and other scenes are not yet validated.
+
+Remaining forced waits: the initial acquire path still calls `ReleaseFences`
+about 1100 times a second (175-250 ms/s in total), though the registry matches
+none of them. Which call pays the host-GPU backlog varies between runs (initial
+or resume poll); the total stays about the same.
