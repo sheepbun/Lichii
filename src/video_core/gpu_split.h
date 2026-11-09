@@ -261,8 +261,8 @@ private:
     bool front_macros{};
     std::unique_ptr<u64[]> ring;
 
-    // Front side.
-    u64 write_position{};
+    // Keep the front's ring bookkeeping apart from fields accessed by the back.
+    alignas(128) u64 write_position{};
     u64 last_writer_position{};
     u64 last_sync_position{};
     u64 published_local{};
@@ -271,8 +271,8 @@ private:
     size_t publish_every{PublishEvery};
     Tegra::Engines::EngineInterface* front_engine{};
 
-    // Back side.
-    Tegra::Engines::EngineInterface* back_engine{};
+    // The back writes this on every engine switch.
+    alignas(128) Tegra::Engines::EngineInterface* back_engine{};
 
     /// Whether the back is done with the Vulkan scheduler until it gets more work: set after its
     /// idle hook ran, cleared before it executes entries.
