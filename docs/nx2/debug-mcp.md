@@ -185,7 +185,10 @@ defaults to 60 and must be positive). `stutters` counts intervals strictly above
 median. `intervals_ms` contains the last up to 120 intervals in chronological order, rounded
 to 0.1 ms. With fewer than two presents, statistics are zero and the interval list is empty.
 Only available samples from the 4096-timestamp ring are used; overflow sets `truncated: true`.
-For example: `{"method":"frame_times","params":{"seconds":5,"refresh_hz":60}}`.
+For example: `{"method":"frame_times","params":{"seconds":5,"refresh_hz":60}}`. With
+`"lookback": true` it returns at once with the presents of the last `seconds` from the ring. The
+server answers one request at a time, so this measures the frames of an `input_sequence` call that
+just returned.
 
 **`screenshot`** `{height?, save?, timeout_s?}`. It requests a 16:9 layout from
 `Layout::DefaultFrameLayout`, and the renderer blits the presented framebuffers into it. The BGRA

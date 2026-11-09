@@ -241,6 +241,18 @@ json FrameTimes(ToolState& state, const json& params) {
         !std::isfinite(refresh_hz) || refresh_hz <= 0.0) {
         throw std::runtime_error{"seconds must be > 0 and <= 60; refresh_hz must be > 0"};
     }
+    // lookback: the presents of the last `seconds`, still in the ring, without waiting. Requests
+    // are served one at a time, so this is how a client measures across a blocking input call.
+    if (params.value("lookback", false)) {
+        const u64 after = g_nx2_present_count.load(std::memory_order_relaxed);
+        const u64 capacity = g_nx2_present_times_ns.size();
+        const u64 end_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                               std::chrono::steady_clock::now().time_since_epoch())
+                               .count();
+        const u64 span_ns = static_cast<u64>(seconds * 1e9);
+        return ReadFrameTimes(after > capacity ? after - capacity : 0, after,
+                              end_ns > span_ns ? end_ns - span_ns : 0, end_ns, refresh_hz);
+    }
     const u64 before = g_nx2_present_count.load(std::memory_order_relaxed);
     const auto begin = std::chrono::steady_clock::now();
     while (std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count() <
