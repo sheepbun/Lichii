@@ -1068,6 +1068,8 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
                               target, insn.Bits(67, 1) != 0, second_target, insn.Bits(16, 8));
                 break;
             }
+            // Both results to PT write nothing (from upstream 587633debe).
+            if (target == 7 && !insn.words[1]) break;
             if (target == 7 || insn.Bits(84, 3) != 7 ||
                 insn.Bits(16, 8) || insn.words[1])
                 return fail(index, "native predicate LUT mode");
