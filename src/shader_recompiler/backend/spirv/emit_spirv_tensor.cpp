@@ -212,6 +212,11 @@ void DefineSoftwareMatrixFunctions(EmitContext& ctx, const IR::Program& program)
         ctx.interfaces.push_back(ctx.tensor_subgroup_id);
         return;
     }
+    // Every TensorMulAdd marks the program as using subgroup shuffles (CollectShaderInfoPass):
+    // without them, the walk below would find nothing.
+    if (!program.info.uses_subgroup_shuffles) {
+        return;
+    }
     const bool cooperative{ctx.profile.support_cooperative_hmma && SupportsCooperativeHmma(program)};
     std::array<bool, 2> needed{};
     for (const auto* block : program.blocks) {
