@@ -2541,7 +2541,7 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
                 const u32 second_count = count - first_count;
                 if (!insn.Bits(60, 1) ||
                     (insn.words[2] & ~0x05800fffU) != 0x081e0000U ||
-                    source_a + 2 > register_limit || source_b >= register_limit ||
+                    (source_a != 255 && source_a + 2 > register_limit) || source_b >= register_limit ||
                     (dest != 255 && dest + first_count > register_limit) ||
                     (second_dest != 255 && second_dest + second_count > register_limit) ||
                     (dest != 255 && second_dest != 255 && second_count != 0 &&
@@ -2557,7 +2557,8 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
                            (source_b != 255 && source_b >= register_limit))) ||
                 (array && !bindless && (!insn.Bits(60, 1) ||
                            (insn.words[2] & ~0x058000ffU) != 0x001e0f00U ||
-                           source_a + 2 > register_limit || source_b >= register_limit ||
+                           (source_a != 255 && source_a + 2 > register_limit) ||
+                           source_b >= register_limit ||
                            dest + 2 > register_limit || second_dest + 2 > register_limit ||
                            (second_dest < dest + 2 && dest < second_dest + 2) ||
                            (insn.words[3] & 0xc00001ffU))) ||
@@ -2685,9 +2686,11 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32 
             // Two coordinates: x in Ra, y in Rb (the coordinate list splits evenly across them);
             // with an offset, x and y in Ra, Ra+1 and the offset in Rb.
             const u32 y = !offsets && !per_tap && !depth ? source_b : source_a == 255 ? 255U : source_a + 1;
+            // An array's layer and x come from Ra, Ra+1: both zero for RZ (as upstream f1a5c6e04f).
+            const u32 array_x = source_a == 255 ? 255U : source_a + 1;
             emit(0x5c98000000000000ULL | predicate | 250 | (u64{15} << 39) | (u64{source_a} << 20));
             emit(0x5c98000000000000ULL | predicate | 251 | (u64{15} << 39) |
-                 (u64{array ? source_a + 1 : y} << 20));
+                 (u64{array ? array_x : y} << 20));
             if (array)
                 emit(0x5c98000000000000ULL | predicate | 252 | (u64{15} << 39) | (u64{source_b} << 20));
             if (second_buffer) {

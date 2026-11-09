@@ -138,7 +138,9 @@ TEST_CASE("Ampere gathers keep coordinate pairs below reserved registers", "[vid
                 std::array{gather, exit}, mode.high_uniforms);
             if (mode.pair && source == mode.boundary - 1) {
                 REQUIRE_FALSE(static_cast<bool>(lowered));
-                REQUIRE(lowered.error == "native texture gather mode");
+                // Lichii checks the uniform-handle array form separately, with its own message.
+                REQUIRE((lowered.error == "native texture gather mode" ||
+                         lowered.error == "native uniform array texture gather mode"));
                 REQUIRE(lowered.instructions.empty());
                 continue;
             }
