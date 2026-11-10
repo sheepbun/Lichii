@@ -20,6 +20,15 @@ Files: dist/qt_themes/default/icons/256x256/eden.png
 Copyright: 2025 Eden Emulator Project
 License: GPL-3.0-or-later
 
+Files: dist/bunx2.bmp
+       dist/bunx2.icns
+       dist/bunx2.ico
+       dist/branding/png/*.png
+Copyright: 2026 Bunx2 contributors
+License: GPL-3.0-or-later
+Comment: Rendered from dist/branding/bunx2.svg and dist/branding/bunx2-small.svg
+         by tools/generate_bunx2_icons.py
+
 Files: dist/qt_themes/qdarkstyle*/LICENSE.*
        dist/qt_themes/qdarkstyle*/style.qrc
        dist/qt_themes/qdarkstyle*/style.qss
