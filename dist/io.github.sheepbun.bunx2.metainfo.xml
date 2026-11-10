@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sheepbun.bunx2</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>Bunx2</name>
+  <summary>Experimental Nintendo Switch 2 emulator fork</summary>
+  <description>
+    <p>Bunx2 is a personal, experimental fork of the Lichii emulator. Its main development target is The Legend of Zelda: Ocarina of Time on Nintendo Switch 2, on Arch Linux with NVIDIA Vulkan drivers.</p>
+    <p>It builds on Lichii, Eglantine, Eden, yuzu and Sudachi, and keeps their contributors' copyright notices. Compatibility and performance vary by game and hardware.</p>
+  </description>
+  <launchable type="desktop-id">io.github.sheepbun.bunx2.desktop</launchable>
+  <provides><binary>bunx2</binary></provides>
+  <categories><category>Game</category><category>Emulator</category></categories>
+  <url type="homepage">https://github.com/sheepbun/Bunx2</url>
+  <url type="vcs-browser">https://github.com/sheepbun/Bunx2</url>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.sheepbun">
+    <name>Bunx2 contributors</name>
+  </developer>
+  <content_rating type="oars-1.0"/>
+</component>

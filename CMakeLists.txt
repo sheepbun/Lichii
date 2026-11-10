@@ -74,8 +74,9 @@ endif()
 option(ENABLE_QT "Enable the Qt frontend" ON)
 option(ENABLE_QT_TRANSLATION "Enable translations for the Qt frontend" OFF)
 option(ENABLE_UPDATE_CHECKER "Enable update checker (for Qt and Android)" OFF)
-set(LICHII_BUILD_TAG "" CACHE STRING "Published build-N release tag; empty for local builds")
-set(LICHII_BUILD_PLATFORM "" CACHE STRING "Release asset platform and variant, such as linux-x86_64-pgo")
+option(BUNX2_COMPATIBILITY_REPORTS "Offer opt-in compatibility reports to Lichii's website (lichii.zortos.me), which Bunx2 does not run" OFF)
+set(BUNX2_BUILD_TAG "" CACHE STRING "Published build-N release tag; empty for local builds")
+set(BUNX2_BUILD_PLATFORM "" CACHE STRING "Release asset platform and variant, such as linux-x86_64-pgo")
 cmake_dependent_option(YUZU_USE_QT_MULTIMEDIA "Use QtMultimedia for Camera"  OFF "NOT YUZU_USE_BUNDLED_QT" OFF)
 cmake_dependent_option(YUZU_USE_QT_WEB_ENGINE "Use QtWebEngine for web applet implementation" OFF "NOT YUZU_USE_BUNDLED_QT" OFF)
 set(YUZU_QT_MIRROR "" CACHE STRING "What mirror to use for downloading the bundled Qt libraries")
@@ -84,10 +85,19 @@ cmake_dependent_option(YUZU_USE_BUNDLED_QT "Download bundled Qt binaries" "${MSV
 option(ENABLE_DEBUG_TOOLS "Enable debugging tools (maxwell disassembler, SPIRV translator, etc)" OFF)
 option(ENABLE_WERROR "Enable -Werror diagnostics" ON)
 
-option(LICHII_FUZZERS "Build libFuzzer harnesses for the game-file parsers (clang only; instruments everything with ASan and UBSan)" OFF)
-if (LICHII_FUZZERS)
+option(BUNX2_FUZZERS "Build libFuzzer harnesses for the game-file parsers (clang only; instruments everything with ASan and UBSan)" OFF)
+
+# Lichii's names for these settings are still accepted from existing build scripts.
+foreach (_setting BUILD_TAG BUILD_PLATFORM FUZZERS)
+    if (NOT BUNX2_${_setting} AND LICHII_${_setting})
+        message(DEPRECATION "LICHII_${_setting} is deprecated, use BUNX2_${_setting}")
+        set(BUNX2_${_setting} "${LICHII_${_setting}}")
+    endif()
+endforeach()
+
+if (BUNX2_FUZZERS)
     if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR MSVC)
-        message(FATAL_ERROR "LICHII_FUZZERS needs clang with libFuzzer")
+        message(FATAL_ERROR "BUNX2_FUZZERS needs clang with libFuzzer")
     endif()
     add_compile_options(
         $<$<COMPILE_LANGUAGE:C,CXX>:-fsanitize=address,undefined,fuzzer-no-link>
@@ -770,15 +780,20 @@ endif()
 
 # TODO: Icon/install handling n such should be put into dist/CMakeLists.txt
 if(ENABLE_QT AND UNIX AND NOT APPLE)
-    install(FILES "dist/io.github.zortos293.lichii.desktop"
+    install(FILES "dist/io.github.sheepbun.bunx2.desktop"
         DESTINATION "share/applications")
-    install(FILES "dist/lichii.png"
-        DESTINATION "share/icons/hicolor/256x256/apps"
-        RENAME "io.github.zortos293.lichii.png")
+    foreach(_size 16 24 32 48 64 128 256 512)
+        install(FILES "dist/branding/png/bunx2-${_size}.png"
+            DESTINATION "share/icons/hicolor/${_size}x${_size}/apps"
+            RENAME "io.github.sheepbun.bunx2.png")
+    endforeach()
+    install(FILES "dist/branding/bunx2.svg"
+        DESTINATION "share/icons/hicolor/scalable/apps"
+        RENAME "io.github.sheepbun.bunx2.svg")
 
-    install(FILES "dist/io.github.zortos293.lichii.xml"
+    install(FILES "dist/io.github.sheepbun.bunx2.xml"
         DESTINATION "share/mime/packages")
-    install(FILES "dist/io.github.zortos293.lichii.metainfo.xml"
+    install(FILES "dist/io.github.sheepbun.bunx2.metainfo.xml"
         DESTINATION "share/metainfo")
 endif()
 

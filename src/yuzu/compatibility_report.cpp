@@ -114,8 +114,9 @@ Dialog::Dialog(const Session& session, QNetworkAccessManager* network_, QWidget*
     search_row->addWidget(query, 1);
     search_row->addWidget(search);
     layout->addLayout(search_row);
-    auto* search_notice = new QLabel(tr("Search sends only the text above to lichii.zortos.me. "
-                                        "The service sees your IP address."),
+    auto* search_notice = new QLabel(tr("Search sends only the text above to lichii.zortos.me, "
+                                        "Lichii's compatibility website. The Lichii project runs "
+                                        "it, not Bunx2. The service sees your IP address."),
                                      this);
     search_notice->setWordWrap(true);
     layout->addWidget(search_notice);
@@ -187,7 +188,7 @@ Dialog::Dialog(const Session& session, QNetworkAccessManager* network_, QWidget*
                       "not collected. Do not paste logs, paths, keys or private details."));
     setup_notice->setWordWrap(true);
     setup->addRow(setup_notice);
-    line(setup, QStringLiteral("build"), tr("Lichii build"), Known(session.build));
+    line(setup, QStringLiteral("build"), tr("Bunx2 build"), Known(session.build));
     line(setup, QStringLiteral("gameVersion"), tr("Game version"), Known(session.game_version));
     line(setup, QStringLiteral("cpu"), tr("CPU"), Known(session.cpu));
     line(setup, QStringLiteral("gpu"), tr("GPU"), Known(session.gpu));

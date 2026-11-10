@@ -256,7 +256,7 @@ add_executable(yuzu
     game/carousel.h game/carousel.cpp
 )
 
-set_target_properties(yuzu PROPERTIES OUTPUT_NAME "lichii")
+set_target_properties(yuzu PROPERTIES OUTPUT_NAME "bunx2")
 
 # Shipped next to the executable: the NX2 switches a GUI launch cannot set another way. Read at
 # startup (LoadNx2Switches in main.cpp); a user copy in %APPDATA%\eden overrides it.
@@ -290,6 +290,10 @@ file(GLOB_RECURSE THEMES ${PROJECT_SOURCE_DIR}/dist/qt_themes/*)
 
 if (ENABLE_UPDATE_CHECKER)
     target_compile_definitions(yuzu PUBLIC ENABLE_UPDATE_CHECKER)
+endif()
+
+if (BUNX2_COMPATIBILITY_REPORTS)
+    target_compile_definitions(yuzu PRIVATE BUNX2_COMPATIBILITY_REPORTS)
 endif()
 
 if (ENABLE_QT_TRANSLATION)
@@ -384,12 +388,12 @@ target_sources(yuzu
 if (APPLE)
     target_sources(yuzu PRIVATE util/macos_sleep.cpp util/macos_sleep.h)
 
-    # Use the supplied Lichii artwork for all macOS generators.
+    # Use the Bunx2 icon for all macOS generators.
     set(_dist "${CMAKE_SOURCE_DIR}/dist")
-    set(_icons "${_dist}/lichii.icns")
+    set(_icons "${_dist}/bunx2.icns")
     if (CMAKE_GENERATOR MATCHES "Xcode")
         set_target_properties(yuzu PROPERTIES
-            MACOSX_BUNDLE_ICON_FILE lichii.icns
+            MACOSX_BUNDLE_ICON_FILE bunx2.icns
             # Also force xcode to manage signing for us.
             XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED ON
             XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED ON)
@@ -501,7 +505,7 @@ target_link_libraries(yuzu PRIVATE OpenSSL::SSL OpenSSL::Crypto SDL3::SDL3)
 if (TARGET nxformat::nxformat)
     target_sources(yuzu PRIVATE nx_tools.h nx_tools.cpp)
     target_link_libraries(yuzu PRIVATE nxformat::nxformat)
-    target_compile_definitions(yuzu PRIVATE LICHII_NX_TOOLS)
+    target_compile_definitions(yuzu PRIVATE BUNX2_NX_TOOLS)
     if (MSVC)
         # Windows may refuse to load the unsigned DLL (Smart App Control, code integrity
         # policies); delay-loaded, only the NX tools are lost, and NxTools::LoadNxformat says so.
@@ -509,10 +513,10 @@ if (TARGET nxformat::nxformat)
         target_link_libraries(yuzu PRIVATE delayimp)
     endif()
 endif()
-if (LICHII_NXFORMAT_RUNTIME)
+if (BUNX2_NXFORMAT_RUNTIME)
     add_custom_command(TARGET yuzu POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${LICHII_NXFORMAT_RUNTIME}" "$<TARGET_FILE_DIR:yuzu>")
+            "${BUNX2_NXFORMAT_RUNTIME}" "$<TARGET_FILE_DIR:yuzu>")
     if (APPLE)
         # The copy is beside the executable in Contents/MacOS; the build path recorded for the
         # imported library doesn't exist on a user's Mac.
@@ -523,8 +527,8 @@ if (LICHII_NXFORMAT_RUNTIME)
         # library.
         include(GNUInstallDirs)
         set_property(TARGET yuzu APPEND PROPERTY BUILD_RPATH "\$ORIGIN")
-        set_property(TARGET yuzu APPEND PROPERTY INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/lichii")
-        install(FILES "${LICHII_NXFORMAT_RUNTIME}" DESTINATION "${CMAKE_INSTALL_LIBDIR}/lichii")
+        set_property(TARGET yuzu APPEND PROPERTY INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/bunx2")
+        install(FILES "${BUNX2_NXFORMAT_RUNTIME}" DESTINATION "${CMAKE_INSTALL_LIBDIR}/bunx2")
     endif()
 endif()
 

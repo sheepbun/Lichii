@@ -10829,8 +10829,8 @@ Error code: %3</source>
         <translation>预填值描述的是启动设置，而不是实测性能。请检查游玩过程中做过的改动。“未知”表示未采集。请勿粘贴日志、路径、密钥或私人信息。</translation>
     </message>
     <message>
-        <source>Lichii build</source>
-        <translation>Lichii 版本</translation>
+        <source>Bunx2 build</source>
+        <translation>Bunx2 版本</translation>
     </message>
     <message>
         <source>Game version</source>
@@ -11475,8 +11475,8 @@ or click to browse</source>
         <translation>下载 NVIDIA DLSS</translation>
     </message>
     <message>
-        <source>Lichii will download %1 from NVIDIA's Streamline %2 release on GitHub into %3.&lt;br&gt;These files are NVIDIA's, under NVIDIA's licence terms below.</source>
-        <translation>Lichii 会把 %1 从 GitHub 上 NVIDIA 的 Streamline %2 发布包下载到 %3。&lt;br&gt;这些文件属于 NVIDIA，适用下方 NVIDIA 的许可条款。</translation>
+        <source>Bunx2 will download %1 from NVIDIA's Streamline %2 release on GitHub into %3.&lt;br&gt;These files are NVIDIA's, under NVIDIA's licence terms below.</source>
+        <translation>Bunx2 会把 %1 从 GitHub 上 NVIDIA 的 Streamline %2 发布包下载到 %3。&lt;br&gt;这些文件属于 NVIDIA，适用下方 NVIDIA 的许可条款。</translation>
     </message>
     <message>
         <source>Accept and Download</source>

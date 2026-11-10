@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-pkgname=lichii-git
+pkgname=bunx2-git
 pkgver=0.r0.g0000000
 pkgrel=1
-pkgdesc='Nintendo Switch emulator (development branch)'
+pkgdesc='Experimental Nintendo Switch 2 emulator fork of Lichii (development branch)'
 arch=('x86_64')
-url='https://github.com/zortos293/lichii'
+url='https://github.com/sheepbun/Bunx2'
 license=('GPL-3.0-or-later')
 depends=(
   'enet'
@@ -41,18 +41,19 @@ makedepends=(
 optdepends=(
   'qt6-wayland: native Wayland support'
 )
-provides=('lichii')
-conflicts=('lichii')
-source=("lichii::git+https://github.com/zortos293/lichii.git#branch=nx2")
+provides=('bunx2')
+# Lichii packages install the same /usr/bin/eden-cli.
+conflicts=('bunx2' 'lichii')
+source=("bunx2::git+https://github.com/sheepbun/Bunx2.git#branch=main")
 sha256sums=('SKIP')
 
 pkgver() {
-  cd "$srcdir/lichii"
+  cd "$srcdir/bunx2"
   printf '0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
 }
 
 build() {
-  cmake -S "$srcdir/lichii" -B "$srcdir/build" -G Ninja \
+  cmake -S "$srcdir/bunx2" -B "$srcdir/build" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_INSTALL_LIBDIR=lib \
@@ -70,5 +71,4 @@ build() {
 
 package() {
   DESTDIR="$pkgdir" cmake --install "$srcdir/build"
-
 }

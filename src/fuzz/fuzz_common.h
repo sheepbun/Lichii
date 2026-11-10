@@ -78,7 +78,7 @@ inline void ReadRomFS(const FileSys::VirtualFile& romfs, Budget& budget) {
 // any real keys, and the harness never reads or writes the user's own keys. Call it before
 // anything touches Core::Crypto::KeyManager.
 inline void UseSyntheticKeys() {
-    const auto dir = std::filesystem::temp_directory_path() / fmt::format("lichii-fuzz-keys-{}", getpid());
+    const auto dir = std::filesystem::temp_directory_path() / fmt::format("bunx2-fuzz-keys-{}", getpid());
     std::filesystem::create_directories(dir);
     std::ofstream keys{dir / "prod.keys"};
     for (const char* kind : {"application", "ocean", "system"}) {

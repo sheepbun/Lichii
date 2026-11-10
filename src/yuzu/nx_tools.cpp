@@ -404,7 +404,7 @@ NxTools::~NxTools() {
 
 bool NxTools::LoadNxformat() {
 #ifdef _WIN32
-    // lichii.exe delay-loads nxformat.dll, so Lichii starts even when Windows refuses to load it
+    // bunx2.exe delay-loads nxformat.dll, so Bunx2 starts even when Windows refuses to load it
     // (Smart App Control and code integrity policies block unsigned DLLs). The tools load it here
     // before their first nxformat call, which would otherwise end the process.
     static const DWORD error =
@@ -819,7 +819,7 @@ void NxTools::EditNxMetadata(const std::string& archive_path) {
     }
     if (!new_icon.isEmpty()) {
         job->icon_file = std::make_unique<QTemporaryFile>(
-            QDir::tempPath() + QStringLiteral("/lichii-icon-XXXXXX.jpg"));
+            QDir::tempPath() + QStringLiteral("/bunx2-icon-XXXXXX.jpg"));
         if (!job->icon_file->open() || job->icon_file->write(new_icon) != new_icon.size() ||
             !job->icon_file->flush()) {
             QMessageBox::warning(parent_widget, title, tr("The icon cannot be saved."));

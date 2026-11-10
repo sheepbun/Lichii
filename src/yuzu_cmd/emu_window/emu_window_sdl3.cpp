@@ -51,7 +51,7 @@ EmuWindow_SDL3::EmuWindow_SDL3(InputCommon::InputSubsystem* input_subsystem_, Co
             game_name = this_->game_name;
         }
         auto* const title = new std::string(fmt::format(
-            "{} | {:.0f} FPS ({:.0f}%)", game_name.empty() ? "Lichii" : game_name,
+            "{} | {:.0f} FPS ({:.0f}%)", game_name.empty() ? "Bunx2" : game_name,
             results.average_game_fps, results.emulation_speed * 100.0f));
         // Timers run on their own thread and AppKit throws when a title is set off the main
         // thread: ApplyPendingTitle sets it from the main loop.

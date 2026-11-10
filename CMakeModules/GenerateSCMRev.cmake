@@ -14,8 +14,8 @@ endfunction()
 
 get_timestamp(BUILD_DATE)
 
-if (LICHII_BUILD_TAG MATCHES "^build-[0-9]+$")
-    set(BUILD_VERSION "${LICHII_BUILD_TAG}")
+if (BUNX2_BUILD_TAG MATCHES "^build-[0-9]+$")
+    set(BUILD_VERSION "${BUNX2_BUILD_TAG}")
     set(IS_DEV_BUILD false)
 elseif (DEFINED GIT_RELEASE)
     set(BUILD_VERSION "${GIT_TAG}")
@@ -37,15 +37,17 @@ set(GIT_DESC ${BUILD_VERSION})
 
 # Generate cpp with Git revision from template
 
-set(BUILD_AUTO_UPDATE_STABLE_REPO "zortos293/Lichii")
+# Releases are only looked up in Bunx2's own repository, never in an upstream one. Bunx2 has no
+# releases yet, so its release builds leave ENABLE_UPDATE_CHECKER off (docs/Options.md).
+set(BUILD_AUTO_UPDATE_STABLE_REPO "sheepbun/Bunx2")
 set(BUILD_AUTO_UPDATE_STABLE_API "api.github.com")
-set(BUILD_AUTO_UPDATE_API_PATH "/repos/zortos293/Lichii/releases?per_page=100")
+set(BUILD_AUTO_UPDATE_API_PATH "/repos/sheepbun/Bunx2/releases?per_page=100")
 set(BUILD_AUTO_UPDATE_WEBSITE "https://github.com")
-set(BUILD_AUTO_UPDATE_REPO "zortos293/Lichii")
+set(BUILD_AUTO_UPDATE_REPO "sheepbun/Bunx2")
 if (NIGHTLY_BUILD)
-    set(REPO_NAME "Lichii Nightly")
+    set(REPO_NAME "Bunx2 Nightly")
 else()
-    set(REPO_NAME "Lichii")
+    set(REPO_NAME "Bunx2")
 endif()
 
 set(BUILD_ID ${GIT_REFSPEC})
