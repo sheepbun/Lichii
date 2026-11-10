@@ -2746,9 +2746,8 @@ private:
     struct WhiteHistory {
         std::array<u32, 16> counts{};
         size_t next{};
-        u32 last{};
         void Push(u32 white) {
-            std::swap(counts[next], last);
+            counts[next] = white;
             next = (next + 1) % counts.size();
         }
         u32 Median() const {
