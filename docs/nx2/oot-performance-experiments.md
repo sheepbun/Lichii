@@ -439,3 +439,208 @@ all CPU-modified buffer ranges instead of copying them re-protected pages the ga
 every frame (~600 write faults per frame) and fell to 25-27 FPS. Running ahead stays off for
 Ocarina; the remaining late reads (query/semaphore words, QMDs, image uploads) and the volume of
 CPU-modified memory make it a much larger change than this.
+
+
+## S8: resume audit and flash measurement repair (2026-11-10)
+
+Starting Bunx2: `e91bd764b9`. Fetched Lichii `bcb37c49f7` and Eglantine
+`78743f30c2` (already contained); merged Lichii into main before further work.
+New commits: #1196 ADPCM polarity, #1197 damaged NUP RomFS texture stand-ins,
+#1200 recommended-settings prompt, #1154 pipeline variable build correction,
+#1199 stale GPU mapping removal. Read the implementation diffs. The NUP
+stand-ins are substitutes, not recovered original textures. This merge alone
+is not a measured performance improvement. Origin remains the only writable remote.
+
+Recovered candidates (all local, not integrated):
+
+- Twelve-PR bundle, `bundle1`: earlier pan/walk ABBA gave 37.04/41.75 FPS vs
+  main 39.12/38.42. No gain established; bundled hypotheses cannot attribute a cause.
+- #1161 head `44520a76f6`, merge `3538955568`, `m1161`: 39.79/41.96 vs main
+  38.79/40.96. No gain established. The later `2102a72272` removes a duplicate
+  `MarkGpuThread` call; it was NOT in the preserved m1161 binary.
+- Frame-ahead probes: main 48.0, m1161 52.75 FPS. One run per build, different
+  traversal progress, rendering unvalidated: not accepted. Late-read trace
+  `s5_m1161_late` reports hundreds of pages per two seconds read after their
+  bytes changed. This is a risk signal, not by itself proof every read is wrong.
+- Resolution probes did not establish an effect. Several previous runs ended
+  with a forced kill because Qt confirmation handling was broken. The current
+  driver sends Alt+Y to the lab process's windows; s5/s6 closed normally.
+
+These numbers are the driver's `walk.fps`: input-observed presents divided by
+requested input duration. They are NOT an independent simulation-rate measure.
+The separate `walk.window.fps` uses a later sliding window and is typically
+higher; do not mix the two. Old owner-profile runs actually logged Low GPU
+accuracy, handheld, 1x, Wait for native shaders, FG off, speed limit 100%.
+They are not the documented High/docked reference profile. Their time-bounded
+walk also covers more game frames in a faster build. Fixed-view and explicit
+warmup options, plus measurement start/end status, were added to the driver
+for controlled comparisons. No 170-real-FPS claim is supported.
+
+### Diagnostic defect
+
+`s6_flash_a0` saved 118 supposed flashes; `s6_flash_a1` saved 204. Invalid as a
+correctness comparison: `WhiteHistory::Push(white)` discarded its argument and
+swapped zeroes forever. Every logged median was zero. Saved title-logo transitions
+and ordinary sky/cloud frames were misclassified. Only 54/69 saved frames even
+showed gameplay HUD hearts; those counts are still not verified artifacts.
+
+Compiled the actual struct extracted from `nx2_gsv.h` into
+`.cache/rig/white-history-repro.cpp`. Feeding 32 samples of 3000 returned median 0
+and exit 1. Replacing the swap with `counts[next] = white` and removing unused
+`last` returned 3000 and exit 0 under `-Wall -Wextra -Werror`. Fix: `abac4f95f1`.
+The watcher remains a brightness-spike heuristic: camera motion, sun and scene
+transitions can trigger it; readback can change race timing. Zero detections
+would not prove rendering correctness.
+
+New candidate `0e99209090` combines the existing #1161 scratch merge with current
+main and the diagnostic repair. Build: `.cache/rig/build`, source `.cache/rig/wt`,
+RelWithDebInfo, GCC, tests enabled. This is a diagnostic candidate, not a proven
+optimization. Owner build and configuration remain untouched.
+
+### Upstream/provenance refresh
+
+- Lichii #1161 unchanged at `44520a76f6`; #1166 `0fd821f6c3` remains open.
+  Read #1166 diff: shared SPIR-V function DontInline control targets compilation
+  time and may cost runtime. Needs a separate shader-cold experiment, not inference
+  from warm steady-state throughput.
+- Lichii #715 `04a3f6f8ae` (open): snapshot storage for two UI shader hashes while
+  running ahead. Diff read; this is narrower than a fix for all late reads and
+  changes the behind-GPU wait too. Not ported as a general flash fix.
+- Quixomatic/Lichii `feat/debug-flash-trigger`, `c0350265ed`, base `99ac3d5955`:
+  asynchronous 64x36 GPU flash probe and later-frame dump. Different diagnostic,
+  not a fix to WhiteHistory. Requires distinguishing trigger from captured frame.
+- Fresh fork scan writes `.cache/rig/forks-s8/branches.jsonl`; old complete scan
+  retained in `.cache/rig/forks/`. No unverified fork change accepted.
+
+Compatibility API now reports 393 entries (was 390). Three new reports saved in
+`.cache/rig/compat-s8.json`: `dc80f998-c1cc-4365-aaa2-66701cdb9e3d` (14700KF,
+4070 Super, Ubuntu, Low, Zora's Domain, 45-60 FPS and first-visit shader stalls);
+`d9afebb9-8934-4730-9a4b-792c99ebbf2f` (5800X, RX9060XT, SteamOS Mesa 26.2-devel,
+High, crash after intro); `90e246ab-0896-4a91-b745-0f0507712f2a` (10940X, 3080Ti,
+Windows, movement/fairy-associated lag and exit crash). No exact SHA, repeatable
+input trace or confirmed regression baseline in these reports. Triage only.
+
+Next: finish build/tests; compare frames-ahead 0/1 with corrected detector,
+measurement-range filtering and saved-frame inspection; separate correctness
+captures from performance runs. Keep frame-ahead disabled by default. Then
+profile the highest measured cost on the current baseline.
+
+
+S8 fixed-view diagnostic results (owner profile, FG off, 4 s warmup, 24 s
+measurement; one run each, not a performance acceptance test):
+
+| Run | Frames ahead | Input-count presents/s | Window presents/s | p50 ms | p99 ms | Gameplay spike detections |
+|---|---:|---:|---:|---:|---:|---:|
+| s8_fixed_a0 | 0 | 43.25 | 43.619 | 23.80 | 32.63 | 0 |
+| s8_fixed_a1 | 1 | 55.83 | 56.076 | 17.73 | 23.05 | 0 |
+
+Measurement present ranges `(2681,3800]` and `(2670,4126]`; saved title/menu
+spikes (21/22) excluded. Gameplay/end screenshots inspected: same rock-side
+Hyrule Field view, no obvious whole-frame corruption in these four stills.
+No proof about transient errors or correct simulation timing. Audio stream
+playing at -10.2 dBFS peak; confirmed-popup exits 3.44/2.92 s. Driver 615.78.08,
+GCC 16.2.1, RelWithDebInfo (-O2), restored owner shader snapshot and warm NVIDIA
+disk cache; no concurrent build during captures. The fork survey ran alongside
+these diagnostic runs, so do not use them as quiet-host performance proof.
+
+Build metadata caveat: `s8-current` source was `0e99209090`, but generated
+`scm_rev.cpp` still stamped `3538955568`; incremental build did not regenerate
+it when only the git checkout changed. Run label/source SHA and binary hash
+were retained. Reconfigured explicitly, rebuilt and preserved `s8-stamped`
+with embedded SHA `0e99209090`. Driver `keep` now rejects a generated-SHA/source
+mismatch and refuses to overwrite a binary label. Use explicit CMake configure
+before each new source revision. The first ctest passed the 1209-case main
+executable but six auxiliary tests were Not Run because their binaries had not
+been built; built those targets for a complete repeat.
+
+
+Full validation after building the auxiliaries: all 7 CTest entries passed
+(34.20 s); the main executable passed 71,681,001 assertions in 1209 cases.
+The extracted WhiteHistory check additionally passes steady brightness,
+a single spike, ring wrap and return-to-dark cases.
+
+`s8_walk_a1` on the correctly stamped candidate produced 36 brightness-spike
+flags in `(2700,3869]`. Inspected pairs 3180 and 3386: an enemy hit effect and
+the camera turning toward sun/clouds, respectively. The walk encounters an
+enemy and Link loses health; combat timing is another source of run-to-run
+variation. These flags are not a rendering-regression verdict. The fixed-view
+workload is preferable for performance attribution. No frame-ahead behavior
+has been accepted into main.
+
+
+## S9: reference-profile synchronization experiments (2026-11-10, in progress)
+
+Main `abac4f95f1` contains Lichii `bcb37c49f7` and Eglantine `78743f30c2`;
+fresh fetch: 306 commits ahead of Lichii, zero behind. Read-only push URLs
+remain disabled. Current-main full CTest from S8: 7/7 passed (39.09 s).
+
+The S8 cycle profile used `0e99209090` (#1161 candidate), owner/Low settings
+and frames-ahead 1. Its BackLoop sample percentages cannot be transferred to
+current main or the reference profile. New run `s9_reference_profile`: main,
+High/docked/1x, Bounded 2 ms native draws, FG off, frames-ahead 0, 100% speed,
+170 cap, fixed rock-side Hyrule Field view; 8 s warmup, 24 s requested measure.
+GCC 16.2.1 RelWithDebInfo (-O2), NVIDIA 615.78.08, owner shader snapshot restored,
+NVIDIA disk cache warm. GPU_PROFILE and 499 Hz perf sampling enabled for diagnosis.
+
+Input-observed presents/s 32.83; sliding-window 33.249, median 31.072 ms,
+p99 36.634 ms, max 78.575 ms. These are guest-present counts, not independent
+simulation progress. The steady last-600-present block averaged 29.893 ms,
+including 18.363 ms waiting for the GPU fence. GPUBack ~521 CPU ms/s, GPU front
+~461 CPU ms/s. Back split waits ~464–486 wall ms/s, but only ~22–23 ms/s
+actually spinning. Front acquire drains ~308–336 wall ms/s. These times overlap
+and must not be summed into a frame budget. Perf (user cycles, no lost samples)
+puts Backoff at 24.02% of the two GPU threads' samples; BackLoop only 3.39%.
+Profiling/counters may be costly: diagnose with them, benchmark without them.
+
+Audio probe playing (-10.2 dBFS), confirmation answered and exit 2.67 s; no
+device loss or semaphore-wait warnings. End screenshot inspected: expected
+rock-side field, no obvious corruption; a still does not rule out transient bugs.
+
+Spin candidate provenance: GonzaCass/Lichii `deck/spin`, commit
+`64e49c9f74c4c0931ee358652580a3c84d104413`, author GonzaCass, parent
+`3282bc789185e40313fd8435ddf35f0badd4ede1`; `git cherry` reports unique patch.
+Cherry-picked with attribution to `scratch/s9-spin-budget`, `34ea7c07fe`;
+14-line diff read. Also found upstream experimental `b6fd58a647` (Djihads80
+`007a132f6f` port), with equivalent adjustable budgets and stricter parsing.
+Neither changes wait ordering. The GonzaCass port applies cleanly to main.
+Preserved `s9-spin` has matching source/embedded SHA; builds both frontends.
+This is an experiment only: its environment switches must not merge.
+
+Hypotheses: shortening back spins may free CPU resources; it may only save
+idle CPU; or extra sleeps may worsen wake latency. ABBA planned: 8192/256/256/8192
+back spins, same binary, front unchanged at 16384; reference settings as above,
+no profiler/counters. Next measured target is front Backoff, not a presumed
+large back-spin cost. Results and acceptance decision pending.
+
+
+S9 back-spin ABBA finished (source/binary `34ea7c07fe`, quiet host; no profiler):
+
+| Run | Back spins | Input presents/s | Window presents/s | p50 ms | p99 ms | GPUBack CPU ms/s | Front CPU ms/s |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| s9_spin_a1 | 8192 | 38.54 | 38.825 | 27.791 | 34.602 | 529 | 504 |
+| s9_spin_b1 | 256 | 39.67 | 39.997 | 26.927 | 31.913 | 517 | 514 |
+| s9_spin_b2 | 256 | 39.46 | 40.062 | 26.148 | 33.391 | 527 | 520 |
+| s9_spin_a2 | 8192 | 39.46 | 39.796 | 27.241 | 33.654 | 541 | 517 |
+
+Decision: not accepted. Input-rate mean +1.45% is smaller than baseline
+repeat spread 2.36%; window-rate mean +1.83%. The result does not establish
+a throughput gain or rule out a small one. GPUBack CPU means 535 vs 522 ms/s;
+no dramatic spin saving. Full distributions including p99.9 and lows retained
+in `.cache/rig/s9-back-spin-results.json` and each run's result. With fewer than
+1000 window intervals, the 0.1% low is only the worst frame, not a robust tail
+estimate. All four have empty pre-run busy lists, audio playing and confirmed
+normal exits (2.30–3.40 s); no device loss. Identical error categories: 121
+NCA messages, 11 unmapped reads, one NIFM message. These pre-existing errors
+are not a clean correctness bill. End screenshot b2 inspected in the same
+field view. No simulation-rate or transient-rendering proof.
+
+Next: front budget 256 vs default 16384 with back fixed at 8192, alternating
+C/A/C/A. Same binary/profile/warmup/window and FG/frames-ahead off. This tests
+the largest sampled front cost without altering acquire ordering.
+
+Upstream audit: `.cache/rig/s9-upstream-review.md` records source diffs,
+#1161/#1166 still unchanged, and compatibility reports still 393. New host
+commit-budget branch `ef5b9f6434` applies its new headroom cap on Windows,
+not this Linux host; index-check `64374673b7` is diagnostic. Neither is an
+applicable performance fix. Fork scan has 765 branch rows; full coverage
+is not asserted. No optimization has been accepted or merged in S9.
