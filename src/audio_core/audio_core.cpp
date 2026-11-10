@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "audio_core/audio_core.h"
+#include "audio_core/sink/silent_input_stream.h"
 #include "audio_core/sink/sink_details.h"
 #include "common/settings.h"
 #include "core/core.h"
@@ -28,7 +29,11 @@ void AudioCore::CreateSinks() {
     const auto& audio_input_device_id{Settings::values.audio_input_device_id};
 
     output_sink = Sink::CreateSinkFromID(sink_id.GetValue(), audio_output_device_id.GetValue());
-    input_sink = Sink::CreateSinkFromID(sink_id.GetValue(), audio_input_device_id.GetValue());
+    if (audio_input_device_id.GetValue() == Sink::no_device_name) {
+        input_sink = std::make_unique<Sink::SilentInputSink>();
+    } else {
+        input_sink = Sink::CreateSinkFromID(sink_id.GetValue(), audio_input_device_id.GetValue());
+    }
     input_sink->SetDeviceVolume(Settings::values.microphone_volume.GetValue() / 100.0f);
 }
 

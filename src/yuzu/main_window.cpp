@@ -550,6 +550,18 @@ MainWindow::MainWindow(bool has_broken_vulkan)
             ui->action_Fullscreen->setChecked(lp.fullscreen);
         }
 
+        if (lp.game_only && !lp.filepath.empty()) {
+            game_only = true;
+            ui->menubar->hide();
+            statusBar()->hide();
+            // The game list must not appear beside a separate render window.
+            if (!ui->action_Single_Window_Mode->isChecked()) {
+                ui->action_Single_Window_Mode->setChecked(true);
+                ToggleWindowMode();
+            }
+            UpdateWindowTitle();
+        }
+
         if (!lp.filepath.empty()) {
             BootGame(QString::fromStdString(lp.filepath), ApplicationAppletParameters());
         } else if (lp.launch_setup) {
@@ -2064,7 +2076,7 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
             game_list->SetScanEnabled(true);
             game_list->PopulateAsync(UISettings::values.game_dirs);
         }
-        if (close_pending) {
+        if (close_pending || (game_only && !emulation_running)) {
             QTimer::singleShot(0, this, &QWidget::close);
         }
     };
@@ -2353,6 +2365,9 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
             std::filesystem::path{Common::U16StringFromBuffer(filename.utf16(), filename.size())}
                 .filename());
     }
+    if (game_only) {
+        running_title_name = title_name;
+    }
     const bool is_64bit = QtCommon::system->Kernel().ApplicationProcess()->Is64Bit();
     const auto instruction_set_suffix = is_64bit ? tr("(64-bit)") : tr("(32-bit)");
     title_name = tr("%1 %2", "%1 is the title name. %2 indicates if the title is 64-bit or 32-bit")
@@ -2558,7 +2573,7 @@ void MainWindow::OnEmulationStopped() {
     QtCommon::system->HIDCore().ReloadInputDevices();
     UpdateStatusButtons();
     LOG_INFO(Frontend, "Emulation cleanup completed");
-    if (close_pending) {
+    if (close_pending || game_only) {
         QTimer::singleShot(0, this, &QWidget::close);
     } else if (!boot_in_progress) {
         game_list->SetScanEnabled(true);
@@ -3641,8 +3656,8 @@ void MainWindow::HideFullscreen() {
             show();
         }
 
-        statusBar()->setVisible(ui->action_Show_Status_Bar->isChecked());
-        ui->menubar->show();
+        statusBar()->setVisible(!game_only && ui->action_Show_Status_Bar->isChecked());
+        ui->menubar->setVisible(!game_only);
     } else {
         if (UsingExclusiveFullscreen()) {
             render_window->showNormal();
@@ -3697,9 +3712,9 @@ void MainWindow::ResetWindowSize(u32 width, u32 height) {
             render_window->showNormal();
         }
     }
-    const bool show_status_bar = ui->action_Show_Status_Bar->isChecked();
+    const bool show_status_bar = !game_only && ui->action_Show_Status_Bar->isChecked();
     const auto status_bar_height = (single_window && show_status_bar) ? statusBar()->height() : 0;
-    const auto menu_bar_height = single_window ? menuBar()->height() : 0;
+    const auto menu_bar_height = (single_window && !game_only) ? menuBar()->height() : 0;
     const auto extra_height = menu_bar_height + status_bar_height;
 
     auto* current_screen = this->screen();
@@ -4289,7 +4304,7 @@ void MainWindow::OnToggleFilterBar() {
 }
 
 void MainWindow::OnToggleStatusBar() {
-    statusBar()->setVisible(ui->action_Show_Status_Bar->isChecked());
+    statusBar()->setVisible(!game_only && ui->action_Show_Status_Bar->isChecked());
 }
 
 void MainWindow::OnTogglePerfOverlay() {
@@ -4988,6 +5003,16 @@ void MainWindow::OnApplicationChanged(u64 program_id) {
 
 void MainWindow::UpdateWindowTitle(std::string_view title_name, std::string_view title_version,
                                    std::string_view gpu_vendor) {
+    // --game-only uses eden-cli's titlebar: "Bunx2", then the game's name, to which
+    // UpdateStatusBar adds "| <fps> FPS (<speed>%)".
+    if (game_only) {
+        if (title_name.empty()) {
+            running_title_name.clear();
+        }
+        setWindowTitle(running_title_name.empty() ? QStringLiteral("Bunx2")
+                                                  : QString::fromStdString(running_title_name));
+        return;
+    }
     static const std::string build_id = std::string{Common::g_build_id};
     static const std::string yuzu_title =
         fmt::format("{} | {} | {}", std::string{Common::g_build_name},
@@ -5294,6 +5319,10 @@ void MainWindow::UpdateStatusButtons() {
 
 // TODO(crueter): Use this for game list stuff
 void MainWindow::UpdateUISettings() {
+    // A --game-only session forces its own layout; keep the one normal launches restore.
+    if (game_only) {
+        return;
+    }
     if (!ui->action_Fullscreen->isChecked()) {
         UISettings::values.geometry = saveGeometry();
         UISettings::values.renderwindow_geometry = render_window->saveGeometry();

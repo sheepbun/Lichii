@@ -13,6 +13,7 @@
 #include "dedicated_room/yuzu_room.h"
 #endif
 #ifdef __unix__
+#include <string_view>
 #include "qt_common/gui_settings.h"
 #endif
 
@@ -80,6 +81,32 @@ static Qt::HighDpiScaleFactorRoundingPolicy GetHighDpiRoundingPolicy() {
     return Qt::HighDpiScaleFactorRoundingPolicy::PassThrough;
 #endif
 }
+
+#ifdef __unix__
+/// The .desktop file the windows belong to: --desktop-file-name, else Bunx2's own. The main
+/// window is shown while it is constructed, before the launch parameters are parsed, and Qt
+/// reports the name only when it creates a native window, so it is read from argv here.
+static QString GetDesktopFileName(int argc, char* argv[]) {
+    constexpr std::string_view option = "--desktop-file-name";
+    std::string_view name;
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view arg{argv[i]};
+        if (arg == option && i + 1 < argc) {
+            name = argv[i + 1];
+        } else if (arg.starts_with(option) && arg.size() > option.size() &&
+                   arg[option.size()] == '=') {
+            name = arg.substr(option.size() + 1);
+        }
+    }
+    if (name.ends_with(".desktop")) {
+        name.remove_suffix(std::string_view{".desktop"}.size());
+    }
+    if (name.empty()) {
+        return QStringLiteral("io.github.sheepbun.bunx2");
+    }
+    return QString::fromUtf8(name.data(), static_cast<qsizetype>(name.size()));
+}
+#endif
 
 int main(int argc, char* argv[]) {
     LoadNx2Switches(argv[0]);
@@ -166,7 +193,7 @@ int main(int argc, char* argv[]) {
 
     // Fix the Wayland appId. This needs to match the name of the .desktop file without the .desktop
     // suffix.
-    QGuiApplication::setDesktopFileName(QStringLiteral("io.github.sheepbun.bunx2"));
+    QGuiApplication::setDesktopFileName(GetDesktopFileName(argc, argv));
 #endif
 
     auto rounding_policy = GetHighDpiRoundingPolicy();

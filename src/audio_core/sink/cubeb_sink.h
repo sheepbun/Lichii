@@ -83,6 +83,8 @@ private:
     cubeb_devid output_device{};
     /// Cubeb id of the actual hardware input device
     cubeb_devid input_device{};
+    /// Requested input device that is not connected; its streams capture silence
+    std::string missing_input_name{};
     /// Vector of streams managed by this sink
     std::vector<SinkStreamPtr> sink_streams{};
 

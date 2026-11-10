@@ -22,6 +22,8 @@ class System;
 namespace AudioCore::Sink {
 
 constexpr char auto_device_name[] = "auto";
+/// Input device setting that keeps every host microphone closed; games capture silence.
+constexpr char no_device_name[] = "none";
 
 /**
  * This class is an interface for an audio sink, holds multiple output streams and is responsible

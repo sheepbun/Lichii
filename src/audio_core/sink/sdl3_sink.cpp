@@ -4,6 +4,7 @@
 // SPDX-FileCopyrightText: Copyright 2018 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -11,6 +12,7 @@
 
 #include "audio_core/common/common.h"
 #include "audio_core/sink/sdl3_sink.h"
+#include "audio_core/sink/silent_input_stream.h"
 #include "audio_core/sink/sink_stream.h"
 #include "common/logging.h"
 #include "common/scope_exit.h"
@@ -44,16 +46,16 @@ namespace {
     return true;
 }
 
-SDL_AudioDeviceID FindAudioDeviceByName(const std::string& device_name, bool capture) {
+std::optional<SDL_AudioDeviceID> FindAudioDeviceByName(const std::string& device_name,
+                                                       bool capture) {
     int device_count = 0;
     SDL_AudioDeviceID* devices = capture ? SDL_GetAudioRecordingDevices(&device_count)
                                          : SDL_GetAudioPlaybackDevices(&device_count);
     if (devices == nullptr) {
-        return capture ? SDL_AUDIO_DEVICE_DEFAULT_RECORDING : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+        return std::nullopt;
     }
 
-    SDL_AudioDeviceID selected = capture ? SDL_AUDIO_DEVICE_DEFAULT_RECORDING
-                                         : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+    std::optional<SDL_AudioDeviceID> selected;
     for (int i = 0; i < device_count; ++i) {
         const char* current_name = SDL_GetAudioDeviceName(devices[i]);
         if (current_name != nullptr && device_name == current_name) {
@@ -100,10 +102,12 @@ public:
             capture = true;
         }
 
+        const SDL_AudioDeviceID default_device =
+            capture ? SDL_AUDIO_DEVICE_DEFAULT_RECORDING : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
         const SDL_AudioDeviceID audio_device =
-            device_name.empty() ? (capture ? SDL_AUDIO_DEVICE_DEFAULT_RECORDING
-                                           : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
-                                : FindAudioDeviceByName(device_name, capture);
+            device_name.empty()
+                ? default_device
+                : FindAudioDeviceByName(device_name, capture).value_or(default_device);
 
         stream = SDL_OpenAudioDeviceStream(audio_device, &spec, &SDLSinkStream::DataCallback,
                                            this);
@@ -257,6 +261,17 @@ SDLSink::~SDLSink() = default;
 SinkStream* SDLSink::AcquireSinkStream(Core::System& system, u32 system_channels_,
                                        const std::string&, StreamType type) {
     system_channels = system_channels_;
+    // A chosen microphone that is not connected must not be replaced by the system default,
+    // which may be a Bluetooth headset that opening switches to HFP.
+    if (type == StreamType::In && !input_device.empty() &&
+        !FindAudioDeviceByName(input_device, true)) {
+        LOG_WARNING(Audio_Sink, "Microphone \"{}\" is not connected, capturing silence",
+                    input_device);
+        SinkStreamPtr& silent = sink_streams.emplace_back(
+            std::make_unique<SilentInputStream>(system, system_channels));
+        silent->SetDeviceVolume(device_volume);
+        return silent.get();
+    }
     SinkStreamPtr& stream = sink_streams.emplace_back(std::make_unique<SDLSinkStream>(
         device_channels, system_channels, output_device, input_device, type, system));
     stream->SetDeviceVolume(device_volume);

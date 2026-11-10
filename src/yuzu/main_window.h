@@ -570,6 +570,9 @@ private:
     std::optional<CompatibilityReporting::Session> report_session;
     bool boot_in_progress = false;
     bool close_pending = false;
+    // Started with --game-only: no menu or status bar, the UI layout is not saved, and Bunx2
+    // quits when the game stops.
+    bool game_only = false;
     // The path to the game currently running
     QString current_game_path;
     // Whether a user was set on the command line (skips UserSelector if it's forced to show up)

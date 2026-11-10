@@ -45,6 +45,8 @@ struct LaunchParams {
     bool launch_hlaunch = false;
     bool launch_qlaunch = false;
     bool launch_setup = false;
+    // --game-only: with a game to boot, show only the game and quit when it stops.
+    bool game_only = false;
 };
 
 LaunchParams ParseLaunchParams(Core::System& system, int argc, char *argv[], wchar_t *argv_w[]) noexcept;

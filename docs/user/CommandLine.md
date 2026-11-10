@@ -24,6 +24,8 @@ Only the Qt frontend supports the following arguments:
     - Requires a copy of Atmosphere to be extracted onto `sdmc`.
     - This is a shorthand for `<eden folder>/sdmc/atmosphere/hbl.nsp`.
 - `-setup`: Launch setup applet.
+- `--game-only`: With `-g`, show only the game: no menu bar or status bar, and Bunx2 quits when the game stops. It uses the same settings, per-game settings and controllers as a launch from the game list, and leaves the saved window layout alone. Meant for desktop shortcuts, for example `bunx2 --game-only -g <path>`.
+- `--desktop-file-name <name>`: The windows belong to `<name>.desktop` instead of `io.github.sheepbun.bunx2.desktop`, so the desktop shows that launcher's name and icon for the running game. On X11 this sets `_GTK_APPLICATION_ID`, which GNOME checks before `WM_CLASS`; on Wayland it sets the app ID. For example `bunx2 --game-only --desktop-file-name my-game -g <path>` from `my-game.desktop`.
 
 `eden` (provided with `--room`), and `eden-room` supports the following options as well:
 

@@ -9,6 +9,7 @@
 
 #include "audio_core/common/common.h"
 #include "audio_core/sink/cubeb_sink.h"
+#include "audio_core/sink/silent_input_stream.h"
 #include "audio_core/sink/sink_stream.h"
 #include "common/logging.h"
 #include "common/scope_exit.h"
@@ -247,6 +248,7 @@ CubebSink::CubebSink(std::string_view target_device_name) {
                                     &collection) != CUBEB_OK) {
             LOG_WARNING(Audio_Sink, "Audio device enumeration not supported");
         } else {
+            bool input_found = false;
             for (size_t i = 0; i < collection.count; ++i) {
                 const auto& device = collection.device[i];
                 if (!device.friendly_name || target_device_name != device.friendly_name ||
@@ -255,12 +257,16 @@ CubebSink::CubebSink(std::string_view target_device_name) {
                 }
                 if (device.type & CUBEB_DEVICE_TYPE_INPUT) {
                     input_device = device.devid;
+                    input_found = true;
                 }
                 if (device.type & CUBEB_DEVICE_TYPE_OUTPUT) {
                     output_device = device.devid;
                 }
             }
             cubeb_device_collection_destroy(ctx, &collection);
+            if (!input_found) {
+                missing_input_name = target_device_name;
+            }
         }
     }
 
@@ -290,6 +296,16 @@ CubebSink::~CubebSink() {
 SinkStream* CubebSink::AcquireSinkStream(Core::System& system, u32 system_channels_,
                                          const std::string& name, StreamType type) {
     system_channels = system_channels_;
+    // A chosen microphone that is not connected must not be replaced by the system default,
+    // which may be a Bluetooth headset that opening switches to HFP.
+    if (type == StreamType::In && !missing_input_name.empty()) {
+        LOG_WARNING(Audio_Sink, "Microphone \"{}\" is not connected, capturing silence",
+                    missing_input_name);
+        SinkStreamPtr& silent = sink_streams.emplace_back(
+            std::make_unique<SilentInputStream>(system, system_channels));
+        silent->SetDeviceVolume(device_volume);
+        return silent.get();
+    }
     SinkStreamPtr& stream = sink_streams.emplace_back(std::make_unique<CubebSinkStream>(
         ctx, type == StreamType::In ? 2U : device_channels, system_channels,
         type == StreamType::In ? nullptr : output_device,

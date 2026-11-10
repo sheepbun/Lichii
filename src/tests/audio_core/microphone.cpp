@@ -4,6 +4,7 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include "audio_core/sink/input_processing.h"
+#include "audio_core/sink/silent_input_stream.h"
 #include "common/scope_exit.h"
 #include "tests/audio_core/sysmix_test_context.h"
 
@@ -42,4 +43,25 @@ TEST_CASE("Capture uses the input sink gain instead of rereading configuration",
     SECTION("legacy capture with underrun padding") {
         REQUIRE(stream.ReleaseBuffer(4) == std::vector<s16>{500, -1000, 0, 0});
     }
+}
+
+TEST_CASE("Microphone set to none gives each capture its own silent stream", "[audio][input]") {
+    using namespace AudioCore::Sink;
+    SysmixTests::Context context;
+    SilentInputSink sink;
+    sink.SetDeviceVolume(0.5f);
+    auto* first = sink.AcquireSinkStream(context.system, 1, "first", StreamType::In);
+    auto* second = sink.AcquireSinkStream(context.system, 2, "second", StreamType::In);
+    REQUIRE(first != nullptr);
+    REQUIRE(second != nullptr);
+    REQUIRE(first != second);
+    REQUIRE(first->IsReady());
+    REQUIRE(first->GetDeviceVolume() == 0.5f);
+    first->Start();
+    REQUIRE_FALSE(first->IsPaused());
+    first->Stop();
+    REQUIRE(first->IsPaused());
+    sink.CloseStream(first);
+    REQUIRE(second->IsReady());
+    sink.CloseStreams();
 }

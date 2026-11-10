@@ -41,11 +41,13 @@ have not been validated.
 With PipeWire, opening a Bluetooth headset's microphone switches the headset from
 A2DP to HFP/HSP: the sink becomes 16 kHz mono, and an output stream opened while
 the headset was still on A2DP can go silent even though PipeWire keeps it linked.
-If a game loses audio as soon as it starts capturing, select a non-Bluetooth input
-such as the built-in analog microphone in Configure -> Controls -> Microphone,
-switch the headset back to A2DP (or reconnect it), and relaunch the game. The
-Microphone tab has no "None" option, so this also applies when microphone features
-are not used.
+Ocarina opens its capture streams about ten seconds after boot even when no
+microphone feature is in use. If a game loses audio as soon as it starts capturing,
+choose "None (microphone off)" in Configure -> Controls -> Microphone, or a
+non-Bluetooth input if you use voice features, switch the headset back to A2DP (or
+reconnect it), and relaunch the game. With None, games capture silence and no host
+microphone is opened. A chosen microphone that is not connected also gives silence;
+Bunx2 does not fall back to the system default input, which may be the headset.
 
 ## Verification
 

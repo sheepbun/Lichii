@@ -100,6 +100,8 @@ void ConfigureMicrophone::RefreshDevices() {
     }
     devices->clear();
     devices->addItem(tr("System default"), QStringLiteral("auto"));
+    devices->addItem(tr("None (microphone off)"),
+                     QString::fromUtf8(AudioCore::Sink::no_device_name));
     for (const auto& name :
          AudioCore::Sink::GetDeviceListForSink(Settings::values.sink_id.GetValue(), true)) {
         if (name != "null") {
@@ -119,6 +121,10 @@ void ConfigureMicrophone::StartTest() {
     using namespace AudioCore::Sink;
     const auto available = GetDeviceListForSink(Settings::values.sink_id.GetValue(), true);
     const auto selected = devices->currentData().toString().toStdString();
+    if (selected == no_device_name) {
+        status->setText(tr("The microphone is off. Games hear silence."));
+        return;
+    }
     if (available == std::vector<std::string>{"null"} ||
         (selected != auto_device_name &&
          std::find(available.begin(), available.end(), selected) == available.end())) {

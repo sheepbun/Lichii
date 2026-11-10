@@ -50,6 +50,8 @@ LaunchParams ParseLaunchParams(Core::System& system, int argc, char *argv[], wch
         {"clear-nup-icon", no_argument, 0, 0x105},
         {"clear-nup-version", no_argument, 0, 0x106},
         {"clear-nup-publisher", no_argument, 0, 0x107},
+        {"game-only", no_argument, 0, 0x108},
+        {"desktop-file-name", required_argument, 0, 0x109},
         {0, 0, 0, 0},
         // clang-format on
     };
@@ -105,6 +107,12 @@ LaunchParams ParseLaunchParams(Core::System& system, int argc, char *argv[], wch
                 break;
             case 0x107:
                 p.edit_nup_publisher = std::string{};
+                break;
+            case 0x108:
+                p.game_only = true;
+                break;
+            case 0x109:
+                // The Qt frontend's main() reads it from argv before any window exists.
                 break;
             case 'i': {
                 p.input_profile = std::string(optarg);
@@ -241,6 +249,10 @@ void ApplyLaunchParams(LaunchParams const& lp) noexcept {
             "-u, --user            Select a specific user profile from 0 to 7\n"
             "-d, --debug           Run the GDB stub on a port from 1 to 65535\n"
             "-v, --version         Output version information and exit\n"
+            "--game-only           Bunx2 only: with -g, show only the game, without the menu and"
+            " status bars, and quit when it stops\n"
+            "--desktop-file-name <name>  Bunx2 only: windows belong to <name>.desktop, so the"
+            " desktop shows that launcher's name and icon\n"
             "--pack-nup <dump> [<out.nup>]"
             " Pack a loose dump with all its updates and DLC into a NUP file and exit\n"
             "--unpack-nup <file.nup> [<out_dir>]"

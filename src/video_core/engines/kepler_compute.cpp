@@ -57,6 +57,22 @@ struct QueuedRelease {
 // order this (GPU) thread queues them, so the last queued one, or memory, is its base.
 template <typename Reduce>
 QueuedRelease QueueRelease(MemoryManager& memory, GPUVAddr address, Reduce&& reduce) {
+    // Only fence-delayed releases need predicting. Below High accuracy with Default fences they
+    // are written without waiting for the host GPU, and the predictions ran ahead of the words
+    // (Ocarina of Time at Low: 0x843 predicted, 0x232 written), passing acquires early; its
+    // channels then waited seconds on compute counters. EDEN_NX2_QUEUED_RELEASES=1 predicts
+    // them anyway (A/B).
+    static const bool always = [] {
+        const char* value = std::getenv("EDEN_NX2_QUEUED_RELEASES");
+        return value != nullptr && value[0] == '1';
+    }();
+    const bool delayed = Settings::IsGPUFenceBehaviorDefault()
+                             ? Settings::IsGPULevelHigh()
+                             : Settings::IsGPUFenceBehaviorBalanced() ||
+                                   Settings::IsGPUFenceBehaviorAccurate();
+    if (!delayed && !always) {
+        return {};
+    }
     const auto device = memory.GpuToCpuAddress(address);
     if (!device) {
         return {};

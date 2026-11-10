@@ -7,8 +7,11 @@
 #include <chrono>
 #include <memory>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "audio_core/common/common.h"
+#include "audio_core/sink/sink.h"
 #include "audio_core/sink/sink_stream.h"
 #include "core/core.h"
 #include "core/core_timing.h"
@@ -63,6 +66,42 @@ private:
 
     std::array<s16, TargetSampleCount * 2> silence{};
     std::shared_ptr<Core::Timing::EventType> tick_event;
+};
+
+/**
+ * Input sink for the "none" microphone setting. It never opens a host device, so selecting it
+ * also keeps a Bluetooth headset from switching to its low-quality headset (HFP) profile.
+ */
+class SilentInputSink final : public Sink {
+public:
+    SinkStream* AcquireSinkStream(Core::System& system, u32 system_channels, const std::string&,
+                                  StreamType) override {
+        auto& stream =
+            streams.emplace_back(std::make_unique<SilentInputStream>(system, system_channels));
+        stream->SetDeviceVolume(device_volume);
+        return stream.get();
+    }
+
+    void CloseStream(SinkStream* stream) override {
+        std::erase_if(streams, [stream](const SinkStreamPtr& s) { return s.get() == stream; });
+    }
+
+    void CloseStreams() override {
+        streams.clear();
+    }
+
+    f32 GetDeviceVolume() const override {
+        return device_volume;
+    }
+
+    void SetDeviceVolume(f32 volume) override {
+        device_volume = volume;
+    }
+
+    void SetSystemVolume(f32) override {}
+
+private:
+    std::vector<SinkStreamPtr> streams;
 };
 
 } // namespace AudioCore::Sink
