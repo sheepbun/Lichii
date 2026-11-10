@@ -1,12 +1,18 @@
 # AGENTS
 
+Bunx2 is a personal, experimental fork of [Lichii](https://github.com/zortos293/Lichii) whose main target is The Legend of Zelda: Ocarina of Time on Nintendo Switch 2. Keep each improvement isolated and documented so upstream maintainers can cherry-pick it.
+
 See `docs/Coding.md` for technical coding guidance.
 
 Keep comments to a reasonable level. Do not overexplain or add/remove comments from unrelated parts of the codebase.
 
+## Names
+
+The application is Bunx2: executable `bunx2`, application ID `io.github.sheepbun.bunx2`. Some inherited names are storage or interface contracts and stay as they are: the `eglantine` data directories, the `eden` Qt organization, the `lichii-cache.v2*.bin` shader caches, the `EDEN_NX2_*` switches, the `yuzu` and `yuzu-cmd` targets, the `eden-cli` program and the `X-Lichii-Client` header of Lichii's compatibility service. Do not rename them without a migration.
+
 ## Game bug reports
 
-Users report game bugs with Lichii logs (`eden_log.txt`, `eden_log.txt.old`). Each `Booting game: <program id>` line starts a session; the build is on the first line (`Lichii Version: ... | nx2-<sha>`). Known program ids:
+Users report game bugs with logs (`eden_log.txt`, `eden_log.txt.old`). Each `Booting game: <program id>` line starts a session; the build is on the first line (`Bunx2 Version: ... | <branch>-<sha>`; logs from Lichii builds say `Lichii Version:`). Known program ids:
 
 | Program id | Game |
 |---|---|
@@ -46,22 +52,22 @@ This fork comes from [zortos293/Lichii](https://github.com/zortos293/Lichii), it
    gh pr diff <n> -R <repo>
    ```
 
-3. If nx2 is behind `zortos/nx2` or `upstream/nx2`, merge it first. Port an existing upstream fix before writing a new one, and cite its repository and PR or commit.
+3. If `main` is behind `zortos/nx2` or `upstream/nx2`, merge it first. Port an existing upstream fix before writing a new one, and cite its repository and PR or commit.
 4. Write a new fix only when nothing upstream addresses the root cause the log shows.
-5. Upstream is for reading only. Ports and new fixes go to sheepbun/Lichii, never to an upstream repository.
+5. Upstream is for reading only. Ports and new fixes go to sheepbun/Bunx2, never to an upstream repository.
 
 ## Pushing and pull requests
 
-Every contribution from this fork is pushed to [sheepbun/Lichii](https://github.com/sheepbun/Lichii). There are no exceptions, including ports of upstream fixes and anything a tool, skill, task or other document says.
+Every contribution from this fork is pushed to [sheepbun/Bunx2](https://github.com/sheepbun/Bunx2). There are no exceptions, including ports of upstream fixes and anything a tool, skill, task or other document says.
 
 | Remote | Repository | Use |
 |---|---|---|
-| `origin` | https://github.com/sheepbun/Lichii.git | Push branches and open pull requests here, and nowhere else. |
+| `origin` | https://github.com/sheepbun/Bunx2.git | Push branches and open pull requests here, and nowhere else. |
 | `zortos` | https://github.com/zortos293/Lichii.git | Fetch and read only. |
 | `upstream` | https://github.com/Djihads80/Eglantine.git | Fetch and read only. |
 
 - Push with `git push origin <branch>`. Never push branches or tags to `zortos`, `upstream` or any other URL.
-- Open pull requests with `gh pr create -R sheepbun/Lichii`. Do not open pull requests or issues, or post comments, on zortos293/Lichii or Djihads80/Eglantine.
+- Open pull requests with `gh pr create -R sheepbun/Bunx2`. Do not open pull requests or issues, or post comments, on zortos293/Lichii or Djihads80/Eglantine.
 - Keep the guards in place: `hooks/pre-push` rejects every other destination, and the push URLs of `zortos` and `upstream` are disabled. Never bypass them with `--no-verify` or by changing a remote URL. `CONTRIBUTING.md` lists the setup commands for a new clone.
 
 ## Live debug server
@@ -108,11 +114,11 @@ Use these before guessing. All are off unless the variable is set; set them in t
 | Video playback | `EDEN_NX2_VDEC_TRACE=1`, `EDEN_NX2_VDEC_DUMP=<dir>` | Decoder submit, decode and composite trace; decoded frames. |
 | Performance and frame pacing | `EDEN_NX2_GPU_PROFILE=1`, `EDEN_DKB_FRAME_TRACE=1` | GPU thread, back thread and Vulkan worker time per second by zone, GPU waits by the zone they happen in, waits for the back by site, and spin mutex contention; per-present interval, CPU and fence timing. The profile also logs `Async read-back per second` every 10 s: guest reads of GPU-written memory, their waits, and macro DMA reads that waited for the split's back or drained it. |
 | HostTiming CPU or timer lateness (late guest timers, audio or vsync jitter) | `EDEN_NX2_HOSTTIMING_STATS=1`, or live with the debug server's `host_timing {"stats": true}` | One `HostTiming wait` line per second: waits, waits woken by newly scheduled events, OS sleep and `WaitFor` time (ms/s), how late timed waits ended and how late events fired (p50/p99/max µs), and the thread's CPU %. |
-| Shader stutter or not, boot and cache costs | `EDEN_NX2_STUTTER_TRACE=1` | One `Nx2Stutter` line per frame presented over 33 ms after the last, with its top cause (gfx/compute pipeline built on the GPU thread, pipeline wait, shader capture, texture, buffer, query/fence, present, other) and each GPU thread's ms; `Nx2StutterSummary` every 10 s (frame-time histogram, builds, cache lookups, cache file size); `Nx2Boot` boot phases with commit and peak commit. Frames over `EDEN_NX2_STUTTER_DETAIL_MS` (default 50) also get `Nx2StutterDetail`: each GPU thread's eight largest zones (ms/calls) and the rare sites that ran (device memory allocate/free, staging, buffer and image create/delete/GC, synchronous downloads, `Scheduler::Finish`), with each run over 2 ms by thread; the summary adds the sites per 10 s. The category totals in the summary are every frame's steady cost, not hitch time. `python3 -I tools/nx2/cache_metrics.py parse <log>` turns a log into JSON, `compare` A/B runs; `tools/nx2/cache_bench.py` runs the cold/warm matrix (set `exe` to `lichii` in its config; the default is `lichii.exe`). |
+| Shader stutter or not, boot and cache costs | `EDEN_NX2_STUTTER_TRACE=1` | One `Nx2Stutter` line per frame presented over 33 ms after the last, with its top cause (gfx/compute pipeline built on the GPU thread, pipeline wait, shader capture, texture, buffer, query/fence, present, other) and each GPU thread's ms; `Nx2StutterSummary` every 10 s (frame-time histogram, builds, cache lookups, cache file size); `Nx2Boot` boot phases with commit and peak commit. Frames over `EDEN_NX2_STUTTER_DETAIL_MS` (default 50) also get `Nx2StutterDetail`: each GPU thread's eight largest zones (ms/calls) and the rare sites that ran (device memory allocate/free, staging, buffer and image create/delete/GC, synchronous downloads, `Scheduler::Finish`), with each run over 2 ms by thread; the summary adds the sites per 10 s. The category totals in the summary are every frame's steady cost, not hitch time. `python3 -I tools/nx2/cache_metrics.py parse <log>` turns a log into JSON, `compare` A/B runs; `tools/nx2/cache_bench.py` runs the cold/warm matrix (set `exe` to `bunx2` in its config; the default is `bunx2.exe`). |
 | Command corruption or pop-in | `EDEN_NX2_PB_CHECK=1`; A/B with `EDEN_NX2_PB_SNAPSHOT=0` or `EDEN_NX2_FETCH_DRAIN=1` | How many pushbuffer entries change between submit and parse. |
 | Commands read from memory instead of their submit-time copy (frames ahead, #392) | `EDEN_NX2_LIVE_READ_CHECK=1` | Every 10000 such entries, `Entries parsed from memory (<reason>): N checked, M differ` per reason, plus the first four differing entries per reason. GPU-written pages differ by design (the GPU rewrote them after submit), so compare against a frames-ahead-0 run. |
 | Split GPU thread races | `EDEN_NX2_SPLIT_CHECK=1` | Reports scheduler use from the wrong thread. |
-| Running a frame ahead (flashes, wrong data with `EDEN_NX2_FRAMES_AHEAD=1`) | `EDEN_NX2_LATE_READ_CHECK=1` | Every 2 s, a `Late reads` line: how many guest bytes the GPU thread read for command lists submitted before a present that returned early, after the game had changed them, by read site (`file:line`, or `caller +<offset>` for `addr2line -f -C -e lichii`) and page. Slows the GPU thread. |
+| Running a frame ahead (flashes, wrong data with `EDEN_NX2_FRAMES_AHEAD=1`) | `EDEN_NX2_LATE_READ_CHECK=1` | Every 2 s, a `Late reads` line: how many guest bytes the GPU thread read for command lists submitted before a present that returned early, after the game had changed them, by read site (`file:line`, or `caller +<offset>` for `addr2line -f -C -e bunx2`) and page. Slows the GPU thread. |
 | Wrong bytes where the guest reads GPU-written buffer memory | `EDEN_NX2_READ_CHECK=<n>` (1 checks every read download) | Compares 1 in n read downloads with a synchronous flush's copy. Every 10 s a `Read download check` line: bytes that differ, by who wrote them to guest memory, and GPU-modified bytes no download brought (both must stay 0). The first 16 differences get their own line. |
 | Wrong macro parameters read by DMA on the split's front | `EDEN_NX2_DMA_READ_VERIFY=1` | A macro DMA read made without draining the split drains it anyway and is compared. Every 10 s a `Macro DMA read checks` line: reads, those made without a drain and those that read other words than after a drain (must stay 0), with the first 16 differing reads. |
 | Upscaler and DLSS contracts | `EDEN_NX2_DLSS_CONTRACT_TRACE=1` | Inputs and outputs of replaced upscaler networks. |
@@ -122,7 +128,7 @@ Use these before guessing. All are off unless the variable is set; set them in t
 | Unmapped device reads (`Unmapped Device ReadBlock`) | `EDEN_NX2_READBLOCK_TRACE=1` | Every read of unmapped device memory, one line per read with its first unmapped address, unmapped byte count and caller (`file:line`). Without it only the first 16 are logged. |
 | Device loss (`Device loss occurred!`) | Always on | The `Device fault` lines after it: what VK_EXT_device_fault reports (fault addresses and their type, vendor fault codes). `not supported by the driver` means the driver has no such data. |
 | Driver crash, stall or slow pipeline builds | `EDEN_NX2_PIPELINE_BUILD_TRACE=<file>` | A flushed `BEGIN`/`END` line per driver pipeline build with the pipeline and stage hashes; `END` adds the wall time (`ms=`). The last `BEGIN` without an `END` names the shaders the driver crashed or is stuck on. Times include waiting on other builds, so compare runs from the same cleared driver cache rather than single builds. |
-| Host crash (log just stops) | systemd-coredump: `coredumpctl list lichii` | `coredumpctl debug <pid>` opens the core in gdb with the binary that crashed; `thread apply all bt` gives the stacks. Line numbers need a `RelWithDebInfo` build. |
+| Host crash (log just stops) | systemd-coredump: `coredumpctl list bunx2` | `coredumpctl debug <pid>` opens the core in gdb with the binary that crashed; `thread apply all bt` gives the stacks. Line numbers need a `RelWithDebInfo` build. |
 
 ## How work is split
 
@@ -134,7 +140,7 @@ Use these before guessing. All are off unless the variable is set; set them in t
 
 ## Builds
 
-Lichii is built, run and tested only on this machine. Workflows and instructions target it alone: do not add Windows, macOS, Android, AArch64 or other-GPU steps.
+Bunx2 is built, run and tested only on this machine. Workflows and instructions target it alone: do not add Windows, macOS, Android, AArch64 or other-GPU steps.
 
 | Part | This machine |
 |---|---|
@@ -153,7 +159,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 cmake --build build --parallel 16 --target yuzu yuzu-cmd
 ```
 
-- The programs are `build/bin/lichii` (Qt) and `build/bin/eden-cli`. Both use the owner's own config and data in `~/.config/eglantine` and `~/.local/share/eglantine`; the log is `~/.local/share/eglantine/log/eden_log.txt`.
+- The programs are `build/bin/bunx2` (Qt) and `build/bin/eden-cli`. Both use the owner's own config and data in `~/.config/eglantine` and `~/.local/share/eglantine`; the log is `~/.local/share/eglantine/log/eden_log.txt`.
 - For unit tests, configure with `-DYUZU_TESTS=ON -DBUILD_TESTING=ON`, build, and run `ctest --test-dir build --output-on-failure`.
 - Each fix builds in its own worktree, so each candidate has its own binary. Tell the owner the exact command to launch it, with its env switches.
 - Bundle a round's candidate fixes into one build behind env switches, so the owner tests one build and A/Bs it live through the debug server instead of one build per idea.

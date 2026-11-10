@@ -38,7 +38,7 @@ all without the user. Built on `eden-cli` (SDL frontend) and the shader lab's di
   `launch --config`.
 - **Never `cd` into dumps or run scripts from them.** Pass paths as arguments, and run Python
   with `-I`.
-- Check `pgrep -af 'eden-cli|eglantine'` before launching: only one instance should own the GPU.
+- Check `pgrep -af 'eden-cli|bunx2'` before launching: only one instance should own the GPU.
   When the user says they're testing manually, `lab_ctl stop` the lab instance at once.
 - **Lab-run every port before the user gets the build**, at least boot-to-save plus a walk.
   Sync and fence-timing changes from forks can deadlock in this tree's GPU split even when they
