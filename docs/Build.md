@@ -1,9 +1,9 @@
-# Building Lichii
+# Building Bunx2
 
 > [!WARNING]
 > This guide is intended for developers ONLY. If you are not a developer or packager, you are unlikely to receive support.
 
-Lichii is built, run and tested on one machine:
+Bunx2 is built, run and tested on one machine. It is the reference development and test configuration, not a minimum requirement:
 
 | Part | This machine |
 |---|---|
@@ -22,8 +22,8 @@ Install the [dependencies](Deps.md) first.
 ## Clone
 
 ```sh
-git clone https://github.com/sheepbun/Lichii.git
-cd Lichii
+git clone https://github.com/sheepbun/Bunx2.git
+cd Bunx2
 ```
 
 Then add the read-only remotes and the push guard from [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -56,10 +56,18 @@ cmake --build build --parallel 16 --target yuzu yuzu-cmd
 
 The programs are:
 
-- `build/bin/lichii`, the Qt frontend
+- `build/bin/bunx2`, the Qt frontend
 - `build/bin/eden-cli`, the command-line frontend
 
-Both read their config from `~/.config/eglantine` and their data from `~/.local/share/eglantine`. The log is `~/.local/share/eglantine/log/eden_log.txt`.
+Both read their config from `~/.config/eglantine` and their data from `~/.local/share/eglantine`. The log is `~/.local/share/eglantine/log/eden_log.txt`. These are the same directories Lichii and Eglantine use, so existing settings, saves, keys and shader caches carry over without migration.
+
+## Install
+
+```sh
+sudo cmake --install build
+```
+
+This installs `bin/bunx2`, `bin/eden-cli`, the desktop entry `io.github.sheepbun.bunx2.desktop`, its icons in the `hicolor` theme, the AppStream metadata and the MIME types under `CMAKE_INSTALL_PREFIX` (default `/usr/local`). [dist/packaging/arch/bunx2-git](../dist/packaging/arch/bunx2-git) packages the same install for pacman.
 
 ## Tests
 

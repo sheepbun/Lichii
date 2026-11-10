@@ -1,6 +1,6 @@
 # Caveats
 
-Lichii is built only on Arch Linux x86_64 (see the [build guide](Build.md)).
+Bunx2 is built only on Arch Linux x86_64 (see the [build guide](Build.md)).
 
 ## Arch Linux
 

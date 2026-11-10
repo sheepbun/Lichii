@@ -6,54 +6,172 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 -->
 
-# Lichii
+<p align="center">
+  <img src="dist/branding/bunx2.svg" alt="Bunx2 logo: a white rabbit outlined in hot pink" width="160">
+</p>
 
-Lichii is an experimental, open-source Nintendo Switch and Switch 2 emulator written in C++. It builds on Eglantine, Eden, yuzu and Sudachi, preserving their contributions while developing this fork's game compatibility and renderer fixes.
+# Bunx2
 
-This is an independent fork, not an official release of those upstream projects. Lichii is not affiliated with Nintendo.
+**Bunx2** (pronounced "bun N X two") combines "bunny" and "NX2", an informal abbreviation for
+Nintendo Switch 2.
 
-Visit the [Lichii game compatibility website](https://lichii.zortos.me) to find games and compare community compatibility reports.
+Bunx2 is a personal, experimental, performance-oriented fork of
+[Lichii](https://github.com/zortos293/Lichii), an open-source Nintendo Switch and Switch 2 emulator
+written in C++. It exists to develop, measure and refine targeted emulator improvements for the new
+*The Legend of Zelda: Ocarina of Time* remake on Nintendo Switch 2.
 
-## Downloads and setup
+Bunx2 is not a new emulator and does not replace Lichii or the projects before it. Almost all of
+its code comes from the projects listed under [Built on and credits](#built-on-and-credits). It is
+not affiliated with or endorsed by those projects, or by Nintendo.
 
-Download Lichii only from this repository's [releases page](https://github.com/zortos293/Lichii/releases). Lichii has no other download site: archives offered elsewhere, such as lichii.org, are not built by this project, and one has been reported to install malware ([#545](https://github.com/zortos293/Lichii/issues/545)).
+## Purpose and philosophy
 
-On Windows, extract the entire build archive and run **lichii.exe**. Only use games and system files you have legally obtained. Games, keys and firmware are not included.
+- **A personal engineering fork.** Bunx2 is where one developer tries changes, measures them, and
+  keeps or drops them. It makes no claim to be better than Lichii.
+- **Narrow on purpose.** One game, one operating system and one GPU vendor come first. Other games
+  and setups are not a goal, and changes made for this one can affect them.
+- **Evidence before changes.** Fixes start from logs, frame dumps, RenderDoc captures and live A/B
+  switches. A successful build or a passing test is not proof that a game renders or runs correctly.
+- **Built to be shared.** Each improvement is kept small and documented so that upstream projects
+  can reuse it. See [Upstream collaboration](#upstream-collaboration).
 
-### Existing saves and settings
+## Primary development target
 
-The rebrand intentionally retains the existing Eden/Eglantine data directories and configuration keys. It does not move or delete saves, settings or shader caches. Back up your saves before testing experimental builds.
+*The Legend of Zelda: Ocarina of Time* for Nintendo Switch 2 (program id `0400486024DEC000`).
+Work aims at correct rendering, steady frame pacing and lower CPU and GPU overhead in that game.
 
-## Compatibility and issue reports
+This README makes no claim about the game's compatibility, performance or completion status. They
+depend on the build, settings, driver and hardware, and are checked case by case. Other games may
+run, and may also regress.
 
-Compatibility and performance vary by game, hardware and driver. Rendering errors, stutters and crashes remain possible. Passing automated tests does not establish that a game renders correctly, and this project makes no universal frame-rate guarantee.
+## Supported environment
 
-Browse [community compatibility reports](https://lichii.zortos.me/reports) for results with each player's build and setup.
+| Part | Supported |
+|---|---|
+| Operating system | Arch Linux, x86_64 |
+| GPU | NVIDIA, through Vulkan |
 
-Desktop reporting requires a build containing [PR #303](https://github.com/zortos293/Lichii/pull/303) and is not available in build 88. In builds that include it, play and stop a Switch 2 game, then right-click that game and choose **Submit compatibility report**. Only the latest session in the current Lichii process is eligible.
+The reference development and test system is an Intel Core i7-11700 with 32 GB of RAM and an
+NVIDIA GeForce RTX 3080 (10 GB) on the `nvidia-open` driver, built with GCC 16, CMake 4 and Qt 6
+from Arch. That is the configuration changes are tested on, not a minimum requirement.
 
-Confirm the matching website catalog entry and review the editable machine, game, setup, and enabled add-on details prefilled where available. Check the public preview and give explicit consent before submitting. Nothing uploads automatically, and the native v1 reporter does not read or upload logs or files.
+Other operating systems, CPU architectures and GPU vendors are not supported. Code inherited for
+Windows, macOS, Android, AMD and other platforms remains in the tree, but Bunx2 does not build or
+test it.
 
-When [reporting an issue](https://github.com/zortos293/Eglantine/issues), include:
+## Current development focus
 
-- The exact build, game version, CPU, GPU and driver version.
-- Relevant settings and steps to reproduce the problem.
-- A screenshot and the log from the affected session, after checking it for personal information.
+1. Game-specific correctness and compatibility.
+2. Rendering fidelity and Vulkan shader correctness, including NX2 native shader lowering.
+3. CPU and GPU scheduling, synchronization and latency.
+4. Shader compilation, caching and frame pacing.
+5. NVIDIA-specific performance investigation and optimization.
+6. Reproducible builds and diagnostics on Arch Linux x86_64.
+7. Maintainable improvements that can be contributed back upstream.
 
-Do not upload game files, keys, firmware or private account information.
+The investigation notes are in [NX2_NOTES.md](NX2_NOTES.md),
+[NX2_GPU_THREAD_SPLIT.md](NX2_GPU_THREAD_SPLIT.md) and [docs/nx2](docs/nx2), for example
+[Ocarina of Time frame rates](docs/nx2/ocarina-dynamic-fps.md) and
+[performance experiments](docs/nx2/oot-performance-experiments.md). The diagnostic switches and
+tools are listed under "Debugging tools" in [AGENTS.md](AGENTS.md) and in [tools/nx2](tools/nx2).
 
-## Building and contributing
+## Building and running
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), the [build guide](docs/Build.md), [user documentation](docs/user/README.md) and [coding guidelines](docs/Coding.md). Every contribution is pushed to [sheepbun/Lichii](https://github.com/sheepbun/Lichii), and builds target Arch Linux x86_64 with an NVIDIA GPU. Some inherited documentation and internal build target names still use upstream names. The GUI build target remains `yuzu`; its output is `build/bin/lichii`.
+Install the [dependencies](docs/Deps.md), then:
 
-Keep changes focused and distinguish code-level checks from actual gameplay testing.
+```sh
+git clone https://github.com/sheepbun/Bunx2.git
+cd Bunx2
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DYUZU_TESTS=OFF -DYUZU_ROOM=OFF -DYUZU_ROOM_STANDALONE=OFF -DUSE_DISCORD_PRESENCE=OFF \
+  -DVulkanHeaders_FORCE_BUNDLED=ON -DVulkanUtilityLibraries_FORCE_BUNDLED=ON
+cmake --build build --parallel 16 --target yuzu yuzu-cmd
+./build/bin/bunx2
+```
 
-## Artwork
-Art created by YOB (yobslab)
-The supplied Lichii logo, icon and library artwork are in [dist/branding](dist/branding). Windows, Linux and macOS icon resources are generated from that artwork by [Generate-LichiiIcons.ps1](tools/Generate-LichiiIcons.ps1).
+This builds two programs:
 
-## Credits and license
+- `build/bin/bunx2`, the Qt frontend (CMake target `yuzu`).
+- `build/bin/eden-cli`, the SDL frontend (CMake target `yuzu-cmd`; it keeps its inherited name).
 
-Lichii inherits the work of the Eglantine, Eden, yuzu and Sudachi projects and their contributors, including Eglantine's original developer Camille LaVey. Original copyright notices and third-party licenses are retained.
+`sudo cmake --install build` installs both, with the `io.github.sheepbun.bunx2` desktop entry,
+icons, AppStream metadata and MIME types. [dist/packaging/arch/bunx2-git](dist/packaging/arch/bunx2-git)
+is a draft pacman package of the same install. The [build guide](docs/Build.md) covers tests and
+build types, and [CONTRIBUTING.md](CONTRIBUTING.md) the remotes and push guard for development.
 
-See [LICENSE.txt](LICENSE.txt) and the source files for applicable license terms.
+Bunx2 publishes no prebuilt releases, and its builds do not check for updates.
+
+### Games, keys and firmware
+
+Use only games, keys and firmware that you dumped from hardware you own, as the law where you live
+allows. Bunx2 includes none of them and does not help you obtain them. Do not attach game files,
+keys, firmware or private account data to issues, logs or pull requests.
+
+### Existing data
+
+Bunx2 uses the same directories as Lichii and Eglantine: `~/.config/eglantine`,
+`~/.local/share/eglantine` and `~/.cache/eglantine`. Settings, saves, keys and shader caches from a
+Lichii installation keep working without migration, and Bunx2 does not move or delete them. Back
+up your saves before testing experimental builds.
+
+### Network services
+
+Bunx2 does not operate any online service. Two inherited features deserve a note:
+
+- Lichii's opt-in **Submit compatibility report** action sends reports to Lichii's compatibility
+  website, which the Lichii project runs. Bunx2 builds leave the action out; see
+  [compatibility reports](docs/compatibility-report.md).
+- When a game opens the emulated news service, the emulator asks GitHub for sheepbun/Bunx2's
+  release notes to show as news, as the inherited code does for its own repository.
+
+## Upstream collaboration
+
+Lichii's and Eglantine's maintainers and contributors are welcome to reuse, cherry-pick, adapt or
+merge any distinct improvement made here, under the project's license. That is why changes are kept
+focused and documented with the evidence behind them. Whether a change is accepted upstream is up to
+that project's review and licensing requirements. Bunx2 never submits changes upstream
+automatically and claims no endorsement from upstream projects.
+
+Before fixing a problem, Bunx2 first checks Lichii and Eglantine for an existing fix and ports it
+with credit to its source. See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
+
+## Built on and credits
+
+Bunx2 exists because of the projects below and the people who built them. Their copyright notices
+stay in the source files, and Git history keeps their commits and authors.
+
+| Project | How Bunx2 relates to it | Source |
+|---|---|---|
+| **Lichii** | Bunx2's direct upstream: Bunx2 is a fork of it. Lichii, maintained by Zortos (zortos293) and its contributors, continued Eglantine's Switch 2 work with renderer fixes, diagnostics and game support that Bunx2 builds on. | [zortos293/Lichii](https://github.com/zortos293/Lichii) |
+| **Eglantine** | Lichii's upstream: a Switch 2 emulator derived from Eden, yuzu and Sudachi, published by Djihads (Djihads80) and the Eglantine contributors. Its README credits developer Camille LaVey with starting the project. | [Eglantine-Community/Eglantine](https://github.com/Eglantine-Community/Eglantine), formerly Djihads80/Eglantine |
+| **Eden** | Eglantine's base: a Nintendo Switch emulator started by developer Camille LaVey and derived from yuzu and Sudachi. | [eden-emu/eden](https://git.eden-emu.dev/eden-emu/eden) |
+| **Sudachi** | A fork of yuzu that Eden names as one of its sources. | Original repository no longer online |
+| **yuzu** | The Nintendo Switch emulator by the yuzu Emulator Project that the projects above descend from. | Original repository no longer online |
+| **Citra** | The Nintendo 3DS emulator whose code base yuzu started from. Citra's early common code came from Dolphin. | Original repository no longer online |
+
+Source file headers also credit code adapted from Torzu, Azahar, Dolphin, Skyline, Ryujinx, PPSSPP,
+dynarmic (merryhime), lsfg-vk and others. Third-party libraries are listed under **Help > Bunx2
+Dependencies** in the application and in [externals](externals), with their licenses in
+[LICENSES](LICENSES) and [.reuse/dep5](.reuse/dep5).
+
+### Artwork
+
+The Bunx2 rabbit logo ([dist/branding/bunx2.svg](dist/branding/bunx2.svg)) is original artwork
+made for Bunx2 and licensed under GPL-3.0-or-later. [tools/generate_bunx2_icons.py](tools/generate_bunx2_icons.py)
+renders the application icons from it.
+
+Lichii's logo and library artwork were created by YOB (yobslab). Bunx2 no longer ships that
+artwork; it remains in Git history (commit `219ed4ff65`).
+
+## License and disclaimer
+
+Bunx2 is distributed under the GNU General Public License, version 3 or later
+([LICENSE.txt](LICENSE.txt)). Files keep the copyright and license notices in their SPDX headers,
+including GPL-2.0-or-later code from yuzu and Citra, and third-party code keeps its own licenses.
+All of those notices remain in effect.
+
+Bunx2 is provided as is, without warranty. It is intended only for software you own and have
+legally obtained.
+
+"Nintendo Switch" and "The Legend of Zelda" are trademarks of Nintendo. Bunx2 is not affiliated
+with, endorsed by or sponsored by Nintendo. Names of other projects are used only to credit them.
