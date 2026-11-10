@@ -54,8 +54,7 @@ The CI duplicate check refuses to publish a tag that already exists. It does **n
 Open Actions → `ci` → Run workflow. Select the branch to build and choose:
 
 - **kind**: `branch` for a test build, or `daily` for a forced daily build of `nx2` only.
-- **platforms**: `all`, `linux`, `windows`, or `macos`. A single-platform run produces a partial release with only that platform's assets.
-- **pgo**: `none` or `both`. For manual runs, `none` is the default. `both` adds PGO variants where supported (Linux x86_64/ARM64 and Windows x86_64); macOS has no PGO variant.
+- **pgo**: `none` or `both`. For manual runs, `none` is the default. `both` adds the Linux x86_64 PGO variant.
 - **publish**: enabled by default. Disable it to keep the build as workflow artifacts without creating/updating a GitHub release.
 
 For automatic `nx2` version releases and scheduled daily builds, the workflow requests both PGO variants by default. Label-triggered PR builds default to non-PGO to keep test builds quicker.
@@ -79,26 +78,10 @@ Both the scheme-preparation job and the publishing job check out CI helper scrip
 | Platform            | Default output               | Optional PGO output    |
 | ------------------- | ---------------------------- | ---------------------- |
 | Linux x86_64        | AppImage and `.tar.gz`       | AppImage and `.tar.gz` |
-| Linux aarch64       | AppImage and `.tar.gz`       | AppImage and `.tar.gz` |
-| Windows x86_64      | clang-cl + ThinLTO `.zip`    | clang-cl + ThinLTO + PGO `.zip` |
-| macOS Apple Silicon | App bundle `.zip` and `.dmg` | Not built              |
 
-The existing build steps use the repository's current CMake targets (`yuzu` and `yuzu-cmd`) and package the produced `eglantine` and `eden-cli` binaries. Linux AppImages require glibc 2.39 or newer. Linux tarballs use system Qt and other shared libraries. The standard Windows build uses clang-cl from a pinned LLVM release (`tools/windows/install-llvm.ps1`, shared with the Windows build-check job) in Release mode with ThinLTO, against the MSVC headers, runtime and SDK. MSVC itself still builds the project for development but is not used for releases. Windows archives contain the deployed runtime dependencies. macOS artifacts are ad-hoc signed, not notarized; Gatekeeper may require the user to approve the app on first launch.
+The existing build steps use the repository's current CMake targets (`yuzu` and `yuzu-cmd`) and package the produced `eglantine` and `eden-cli` binaries. Linux AppImages require glibc 2.39 or newer. Linux tarballs use system Qt and other shared libraries.
 
 Build artifacts are retained for seven days. Published GitHub Release assets remain available until a release is deleted. Daily releases are pruned to approximately the seven most recent; branch releases are rolling and are cleaned up when no longer needed.
-
-## Windows PGO profile
-
-`windows-x86_64-pgo` is the `windows-x86_64` build plus `-fprofile-use=lichii-windows.profdata`. The profile is an LLVM indexed IR profile from clang-cl, so its function names use the MSVC ABI. Linux's `eglantine.profdata` uses Itanium names, and clang-cl cannot use it. The committed profile comes from about six minutes of Ocarina of Time gameplay. Code that run never reached gets no profile data, so other games gain less.
-
-A profile older than the source only produces warnings. Functions whose code changed since training lose their profile data and are compiled as in the ThinLTO build. Retrain when those warnings cover code that matters, or when the LLVM version changes. clang-cl reads only the indexed format its own LLVM writes, so use the version that `tools/windows/install-llvm.ps1` installs.
-
-To retrain:
-
-1. Configure a Release build as the `windows-x86_64` job does, adding `-fprofile-generate=<dir> -fprofile-update=atomic` to `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS`, and build `yuzu`.
-2. Run `lichii.exe` with `LLVM_PROFILE_FILE=<dir>/lichii-%m-%p.profraw`, play the scenes the profile should cover, and exit normally. Counters are written only at exit.
-3. Merge with that LLVM: `llvm-profdata merge -o lichii-windows.profdata <dir>/*.profraw`.
-4. Check that `llvm-profdata show --all-functions lichii-windows.profdata` lists names starting with `?`, then replace the file in the repository root.
 
 ## Release naming
 
@@ -124,5 +107,4 @@ Stable and RC builds get `GIT-RELEASE`, so CMake marks them as release builds. D
 - **The version push is skipped:** check the `VERSION` syntax and whether `vX.Y.Z[-rcN]` already exists as a tag/release. A duplicate is skipped, not rebuilt.
 - **Release notes step fails:** ensure the matching `## [X.Y.Z]` section in `CHANGELOG.md` contains at least one non-blank entry.
 - **Bump workflow cannot create a PR:** enable “Allow GitHub Actions to create and approve pull requests”, or create the release PR manually.
-- **Mac app fails on an older OS:** check the effective minimum OS of Homebrew dylibs. The project's CMake deployment target is 15.0, but dependencies built on a newer runner can raise the effective runtime requirement.
 - **A branch pre-release remains after cleanup:** run Actions → `cleanup-branch` → Run workflow to sweep orphaned branch releases.

@@ -36,6 +36,7 @@
 #include "shader_recompiler/frontend/maxwell/translate_program.h"
 #include "shader_recompiler/ir_opt/passes.h"
 #include "shader_recompiler/program_header.h"
+#include "common/env_gate.h"
 #include "video_core/engines/kepler_compute.h"
 #include "video_core/engines/maxwell_3d.h"
 #include "video_core/memory_manager.h"
@@ -864,6 +865,7 @@ GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {
 
     if (!RefreshStages(graphics_key.unique_hashes)) {
         current_pipeline = nullptr;
+        graphics_miss = "stage-rejected";
         return nullptr;
     }
     graphics_key.state.Refresh(*maxwell3d, dynamic_features);
@@ -1025,7 +1027,10 @@ void PipelineCache::LoadDiskResources(u64 title_id, std::stop_token stop_loading
     const auto load_begin = std::chrono::steady_clock::now();
     StutterTrace::BootMarker("shader_load_begin");
     const auto shader_dir{Common::FS::GetEdenPath(Common::FS::EdenPath::ShaderDir)};
-    const auto base_dir{shader_dir / fmt::format("{:016x}", title_id)};
+    auto base_dir{shader_dir / fmt::format("{:016x}", title_id)};
+    if (title_id == 0x0400C3F00006E000ULL) {
+        base_dir /= "mkw_zero_depth_v1";
+    }
     if (!Common::FS::CreateDir(shader_dir) || !Common::FS::CreateDir(base_dir)) {
         LOG_ERROR(Common_Filesystem, "Failed to create pipeline cache directories");
         return;
@@ -1366,9 +1371,10 @@ void PipelineCache::LoadPipelinesV2(u64 title_id,
         if (!disk_pipelines.insert(hash).second) {
             continue;
         }
-        if (PreloadAllPipelines() || (used_pipelines.empty()
-                                          ? queued_graphics < MaxPipelinesWithoutUsedList
-                                          : used_pipelines.contains(hash))) {
+        // Switch 2 titles stutter on pipelines built mid-game, so all of them are built at boot.
+        if (Settings::CurrentProgramIsSwitch2() || PreloadAllPipelines() ||
+            (used_pipelines.empty() ? queued_graphics < MaxPipelinesWithoutUsedList
+                                    : used_pipelines.contains(hash))) {
             ++queued_graphics;
             boot_graphics.emplace_back(index, *key);
             continue;
@@ -1548,6 +1554,9 @@ void PipelineCache::LoadPipelinesV2(u64 title_id,
         state.has_loaded = true;
     }
     boot.Wait();
+
+    LOG_INFO(Render_Vulkan, "Disk pipelines built {:.1f} s after the load began",
+             std::chrono::duration<double>(std::chrono::steady_clock::now() - load_begin).count());
 
     std::vector<DuplicateGraphicsRecord> no_duplicates;
     AddIncompleteGraphics(state.incomplete_graphics, no_duplicates, disk_pipelines,
@@ -1792,7 +1801,8 @@ void PipelineCache::PrecacheShaders(u64 title_id, std::vector<PrecacheJob> jobs,
 }
 
 void PipelineCache::QueueVulkanPipelineCacheFlush() {
-    if (!use_vulkan_pipeline_cache || vulkan_pipeline_cache_filename.empty()) {
+    if (!use_vulkan_pipeline_cache || vulkan_pipeline_cache_filename.empty() ||
+        !device.CanReadPipelineCacheDuringBuilds()) {
         return;
     }
     if (++pipelines_since_flush < VULKAN_CACHE_FLUSH_PIPELINES) {
@@ -1985,6 +1995,7 @@ GraphicsPipeline* PipelineCache::CurrentGraphicsPipelineSlowPath() {
         StutterTrace::CountLookup(StutterTrace::Lookup::GraphicsPrebuilt);
     }
     if (!pipeline) {
+        graphics_miss = "creation-failed";
         return nullptr;
     }
     constexpr auto save_interval = std::chrono::seconds{15};
@@ -2035,7 +2046,7 @@ void PipelineCache::EvictUnusedPipelines() {
     // this long is destroyed; rebuilding it later requires a full GPU-thread shader translation
     // (~8.5 ms each) plus a driver pipeline cache hit.
     constexpr u64 EvictAfterFrames = 9000;
-    if (frame_count <= EvictAfterFrames) {
+    if (frame_count <= EvictAfterFrames || Settings::CurrentProgramIsSwitch2()) {
         return;
     }
     const u64 cutoff = frame_count - EvictAfterFrames;
@@ -2162,6 +2173,7 @@ GraphicsPipeline* PipelineCache::BuiltPipeline(GraphicsPipeline* pipeline) noexc
         }
     }
     if (discard) {
+        graphics_miss = "async-build";
         static std::atomic<u64> skipped{};
         if ((skipped.fetch_add(1, std::memory_order_relaxed) & 255) == 0) {
             // Counts lookups, not draws: a draw state can look its pipeline up more than once.

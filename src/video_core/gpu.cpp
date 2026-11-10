@@ -4,13 +4,16 @@
 // SPDX-FileCopyrightText: Copyright 2018 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <utility>
+#include <vector>
 
 #include "common/assert.h"
 #include "common/scope_exit.h"
@@ -21,6 +24,7 @@
 #include "core/gpu_dirty_memory_manager.h"
 #include "core/frontend/emu_window.h"
 #include "core/frontend/graphics_context.h"
+#include "core/gpu_dirty_memory_manager.h"
 #include "core/hle/service/nvdrv/nvdata.h"
 #include "core/perf_stats.h"
 #include "video_core/cdma_pusher.h"
@@ -32,6 +36,7 @@
 #include "video_core/engines/kepler_memory.h"
 #include "video_core/engines/maxwell_3d.h"
 #include "video_core/nx2_fast_draw.h"
+#include "video_core/nx2_late_read.h"
 #include "video_core/engines/maxwell_dma.h"
 #include "video_core/gpu.h"
 #include "video_core/pending_maps.h"
@@ -253,6 +258,9 @@ struct GPU::Impl {
 
     /// Push GPU command entries to be processed
     void PushGPUEntries(s32 channel, Tegra::CommandList&& entries) {
+        if (VideoCommon::Nx2LateRead::Enabled()) {
+            entries.late_read_epoch = VideoCommon::Nx2LateRead::SubmitEpoch();
+        }
         gpu_thread.SubmitList(channel, std::move(entries), is_async);
     }
 

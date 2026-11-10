@@ -66,6 +66,7 @@ add_executable(tests
     video_core/maxwell_numeric.cpp
     video_core/maxwell_permute_lod.cpp
     video_core/submission_policy.cpp
+    video_core/semaphore_waiters.cpp
     video_core/native_pending_policy.cpp
     video_core/framebuffer_clear_layers.cpp
     video_core/framebuffer_limits.cpp
@@ -172,6 +173,7 @@ add_executable(tests
     core/font_merge.cpp
     core/ldn.cpp
     core/internal_network/socket_proxy.cpp
+    core/nx2_movie_pacing.cpp
     core/priority_queue.cpp
     core/internal_network/network.cpp
     video_core/memory_tracker.cpp
@@ -185,6 +187,7 @@ add_executable(tests
     video_core/ampere_lowering.cpp
     video_core/ampere_geometry.cpp
     video_core/ampere_i2f.cpp
+    video_core/ampere_gradient.cpp
     video_core/ampere_returns.cpp
     video_core/ampere_guarded_ulea.cpp
     video_core/ampere_compute_lowering.cpp

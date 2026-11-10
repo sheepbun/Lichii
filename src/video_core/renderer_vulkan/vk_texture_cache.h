@@ -844,7 +844,7 @@ public:
 
     [[nodiscard]] VkSampler HandleFor(const ImageView& image_view, bool is_depth);
 
-    /// The guest descriptor and the host state built from it, for EDEN_NX2_FRAME_DUMP_SAMPLED.
+    /// The guest descriptor and the host state built from it, for the frame dump.
     [[nodiscard]] const Tegra::Texture::TSCEntry& Descriptor() const noexcept {
         return descriptor;
     }

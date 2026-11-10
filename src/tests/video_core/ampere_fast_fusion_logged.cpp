@@ -618,13 +618,35 @@ TEST_CASE("Ocarina F2IP packs two rounded unorm bytes", "[video_core][ampere][oo
             CHECK(translation.registers[39] == std::bit_cast<u32>(b));
         }
     }
-    // Other rounding modes and a merge register aren't known forms yet.
+    // Rc's high half lands above the two bytes (from upstream 9a69d8eaf0).
+    auto merged = convert;
+    merged.words[2] = 0x00000406;
+    const auto with_high = LowerToMaxwell(std::array{merged, Exit});
+    INFO(with_high.error);
+    REQUIRE(with_high);
+    HalfIR high_translation{with_high.instructions};
+    for (const f32 a : {0.0f, 127.5f, 300.0f}) {
+        for (const f32 b : {-1.0f, 0.75f, 255.0f}) {
+            CAPTURE(a, b);
+            high_translation.values.clear();
+            high_translation.registers.fill(0xdeadbeef);
+            high_translation.registers[40] = std::bit_cast<u32>(a);
+            high_translation.registers[39] = std::bit_cast<u32>(b);
+            high_translation.registers[6] = 0xabcd1234U;
+            for (const auto& inst : high_translation.block.Instructions()) {
+                if (inst.GetOpcode() == IR::Opcode::SetRegister)
+                    high_translation.registers.at(static_cast<size_t>(inst.Arg(0).Reg())) =
+                        u32(high_translation.Value(inst.Arg(1)));
+                else
+                    high_translation.values.emplace(&inst, high_translation.Evaluate(inst));
+            }
+            CHECK(high_translation.registers[41] == (byte(b) | (byte(a) << 8) | 0xabcd0000U));
+        }
+    }
+    // Other roundings are converted as F2I rounds them.
     auto modified = convert;
     modified.words[2] = 0x000044ff;
-    CHECK_FALSE(LowerToMaxwell(std::array{modified, Exit}));
-    modified = convert;
-    modified.words[2] = 0x00000406;
-    CHECK_FALSE(LowerToMaxwell(std::array{modified, Exit}));
+    CHECK(LowerToMaxwell(std::array{modified, Exit}));
 }
 
 TEST_CASE("Ocarina uniform multiply adds an immediate rather than reading a register",

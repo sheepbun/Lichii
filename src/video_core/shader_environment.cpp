@@ -43,6 +43,7 @@
 #include "video_core/native_lowering.h"
 #include "video_core/nx2_debug_control.h"
 #include "video_core/pipeline_cache_files.h"
+#include "video_core/nx2_diag.h"
 #include "video_core/shader_cache_v2/cache.h"
 #include "video_core/shader_cache_v2/records.h"
 #include "video_core/shader_environment.h"
@@ -679,6 +680,10 @@ std::shared_ptr<const LoweredNativeCode> GenericEnvironment::LowerNativeCode(
         reject_list.find(fmt::format(",{:x},", program_base)) != std::string::npos) {
         throw Shader::RuntimeError("Native shader at {:#x} rejected by EDEN_NX2_REJECT", program_base);
     }
+    if (VideoCommon::Nx2Diag::Active()) {
+        VideoCommon::Nx2Diag::Diagnostics::Get().RegisterProgram(
+            program_base, Shader::Ampere::NativeProgramKey(native));
+    }
     // EDEN_NX2_SHADER_DUMP=<dir>: keep every captured native program (named by its key) so the
     // lowering can be tested offline against all of a game's shaders.
     if (static const char* const dump_directory = std::getenv("EDEN_NX2_SHADER_DUMP");
@@ -777,28 +782,39 @@ std::shared_ptr<const LoweredNativeCode> GenericEnvironment::LowerNativeCode(
         result = MakeLoweredNativeCode(native, sph, native_header_size, verified_traps, lowered);
     }
     const auto& lowered_code = result->code;
+    // What Analyze returns for this program once the environment holds the lowered code.
+    const u64 shader_hash = NativeShaderHash(lowered_code);
+    if (VideoCommon::Nx2Diag::Active()) {
+        VideoCommon::Nx2Diag::Diagnostics::Get().RegisterProgram(
+            program_base, result->native_program_key, shader_hash);
+    }
     // EDEN_NX2_REJECT_HASH=<hash>,...: like EDEN_NX2_REJECT, but by native program key (shader
     // dump file names) or shader hash (frame dump "shaders"), which stay the same between runs.
-    if (static const std::string reject_hashes = [] {
-            const char* text = std::getenv("EDEN_NX2_REJECT_HASH");
-            std::string list = text ? "," + std::string{text} + "," : std::string{};
-            std::ranges::transform(list, list.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            return list;
-        }();
+    if (static const std::string reject_hashes =
+            [] {
+                const char* text = std::getenv("EDEN_NX2_REJECT_HASH");
+                std::string list = text ? "," + std::string{text} + "," : std::string{};
+                std::ranges::transform(list, list.begin(), [](unsigned char c) {
+                    return static_cast<char>(std::tolower(c));
+                });
+                return list;
+            }();
         !reject_hashes.empty()) {
-        for (const u64 hash : {result->native_program_key, NativeShaderHash(lowered_code)}) {
+        for (const u64 hash : {result->native_program_key, shader_hash}) {
             if (reject_hashes.find(fmt::format(",{:016x},", hash)) != std::string::npos) {
-                throw Shader::RuntimeError("Native shader at {:#x} ({:016x}) rejected by EDEN_NX2_REJECT_HASH",
-                                           program_base, hash);
+                throw Shader::RuntimeError(
+                    "Native shader at {:#x} ({:016x}) rejected by EDEN_NX2_REJECT_HASH",
+                    program_base, hash);
             }
         }
     }
     // The same list, changed at runtime by the debug server (docs/nx2/debug-mcp.md).
     if (VideoCore::Nx2Debug::AnyRejected()) {
-        for (const u64 hash : {result->native_program_key, NativeShaderHash(lowered_code)}) {
+        for (const u64 hash : {result->native_program_key, shader_hash}) {
             if (VideoCore::Nx2Debug::IsRejected(hash)) {
-                throw Shader::RuntimeError("Native shader at {:#x} ({:016x}) rejected by the debug server",
-                                           program_base, hash);
+                throw Shader::RuntimeError(
+                    "Native shader at {:#x} ({:016x}) rejected by the debug server", program_base,
+                    hash);
             }
         }
     }

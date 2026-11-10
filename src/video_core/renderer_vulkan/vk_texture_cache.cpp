@@ -4654,7 +4654,8 @@ f32 TextureCacheRuntime::OcarinaFsrLodBias() {
     return *ocarina_fsr_lod_bias;
 }
 
-Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& tsc) {
+Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& tsc)
+    : descriptor{tsc} {
     const auto& device = runtime.device;
     device_ptr = &device;
     descriptor = tsc;

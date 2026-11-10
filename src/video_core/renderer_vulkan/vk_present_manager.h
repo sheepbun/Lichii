@@ -7,6 +7,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <boost/container/deque.hpp>
@@ -38,6 +39,13 @@ struct Frame {
     vk::Semaphore render_ready;
     vk::Fence present_done;
     bool storage_capable{};
+    /// Frames generated for one real frame and the real frame itself form a batch. The present
+    /// thread shows a batch's first frame at once and each later one present_offset after it.
+    bool batch_start{true};
+    std::chrono::nanoseconds present_offset{};
+    /// The game's own frame, not a generated one (EDEN_DKB_FRAME_TRACE latency).
+    bool real{true};
+    std::chrono::steady_clock::time_point queued{};
 };
 
 class PresentManager {
@@ -53,6 +61,9 @@ public:
 
     /// Returns the last used presentation frame
     Frame* GetRenderFrame();
+
+    /// How many frames GetRenderFrame can return now without waiting for presentation.
+    [[nodiscard]] size_t FreeFrames();
 
     /// Pushes a frame for presentation
     void Present(Frame* frame);
@@ -74,6 +85,8 @@ public:
 
 private:
     void PresentThread(std::stop_token token);
+
+    void HoldForBatch(Frame* frame, std::stop_token token);
 
     void CopyToSwapchain(Frame* frame);
 
@@ -107,6 +120,21 @@ private:
     bool storage_supported;
     bool use_present_thread;
     std::atomic<std::size_t> image_count{};
+    std::atomic<u32> queued_batches{};
+    std::chrono::steady_clock::time_point batch_anchor{};
+
+    // EDEN_DKB_FRAME_TRACE: present thread time per second.
+    struct PresentTrace {
+        std::chrono::steady_clock::time_point next{};
+        u32 presents{};
+        double hold_ms{};
+        double acquire_ms{};
+        double acquire_max_ms{};
+        double submit_present_ms{};
+        u32 real_presents{};
+        double real_delay_ms{};
+        double real_delay_max_ms{};
+    } present_trace;
     std::atomic<std::size_t> swapchain_image_count{};
     std::atomic<VkFormat> swapchain_image_format{};
 };

@@ -52,6 +52,11 @@ public:
         return {*last_deadline, reset};
     }
 
+    /// Makes @p now the previous deadline, so the next present is held one interval after it.
+    void Rebase(Clock::time_point now) {
+        last_deadline = now;
+    }
+
 private:
     std::optional<Clock::time_point> last_deadline;
 };

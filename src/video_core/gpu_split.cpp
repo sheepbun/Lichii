@@ -16,6 +16,10 @@
 #include <windows.h>
 #endif
 #include <cstring>
+#ifdef __GLIBC__
+#include <execinfo.h>
+#endif
+#include <cstdio>
 #include <string>
 
 #include "common/dkb_cpu_trace.h"
@@ -84,7 +88,27 @@ void GpuSplit::CheckOwner(const char* where) {
     LOG_ERROR(HW_GPU, "GPU split owner check: {} on thread {} while the back runs; stack:{}",
               where, thread, stack);
 #else
-    (void)where;
+    // Also while the back is idle: its idle hook submits (Scheduler::FlushDeferred).
+    if (on_back_thread || !instance.back_running.load(std::memory_order_acquire)) {
+        return;
+    }
+    static std::atomic<u32> reports{};
+    if (reports.fetch_add(1) >= 12) {
+        return;
+    }
+    std::string stack;
+#ifdef __GLIBC__
+    void* frames[40];
+    const int count = backtrace(frames, 40);
+    if (char** const symbols = backtrace_symbols(frames, count)) {
+        for (int i = 1; i < count; ++i) {
+            stack += fmt::format("\n  {}", symbols[i]);
+        }
+        std::free(symbols);
+    }
+#endif
+    LOG_ERROR(HW_GPU, "GPU split owner check: {} on a thread other than the back; stack:{}", where,
+              stack);
 #endif
 }
 
@@ -99,12 +123,12 @@ void GpuSplit::MaybeStart(Core::System& system_) {
     if (!wanted || !Tegra::g_nx2_ampere.load(std::memory_order_relaxed)) {
         return;
     }
-    // The front reads command lists straight from guest memory; a read that flushes the caches
-    // first (safe DMA, accurate GPU) would touch back-owned state. The settings can change
+    // The front reads command lists straight from guest memory. Accurate GPU keeps the split: the
+    // cache flushes its safe reads would do on the front are the back's, through the split's own
+    // paths (GPU-written command lists, MME DMA reads, fence releases). Only the Safe DMA setting,
+    // which flushes before every read, needs the caches on the front. The settings can change
     // mid-game: hand the engines back to the front (and start again when they allow it).
-    const bool safe_reads = Settings::IsDMALevelDefault() ? Settings::IsGPULevelHigh()
-                                                          : Settings::IsDMALevelSafe();
-    const bool allowed = !safe_reads && !Settings::IsGPULevelHigh() &&
+    const bool allowed = !Settings::IsDMALevelSafe() &&
                          Settings::values.renderer_backend.GetValue() == Settings::RendererBackend::Vulkan;
     if (active && !allowed) {
         Drain();

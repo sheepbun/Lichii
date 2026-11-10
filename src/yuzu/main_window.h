@@ -11,10 +11,10 @@
 
 #include <filesystem>
 #include <QElapsedTimer>
+#include <QFutureWatcher>
 #include <QMainWindow>
 #include <QPointer>
 #include <QMessageBox>
-#include <QFutureWatcher>
 #include <QPushButton>
 #include <QTimer>
 #include <QTranslator>

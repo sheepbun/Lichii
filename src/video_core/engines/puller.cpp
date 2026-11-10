@@ -291,6 +291,9 @@ bool Puller::ResumeAcquire(DmaPusher& dma_pusher) {
     // counting those made the count odd ("suspended") at random, so submit-time snapshots were
     // thrown away for about half of all entries (CommandList::snapshot_suspensions).
     if (pending_acquire) {
+        // Met by a release ahead in command order (or the CPU's): the host GPU runs this
+        // channel's later work after the work before that release.
+        OnBack([rasterizer = dma_pusher.rasterizer] { rasterizer->WaitForIdle(); });
         pending_acquire.reset();
         dma_pusher.suspensions.fetch_add(1, std::memory_order_release);
         Nx2SemaphoreWaiters::Get().Remove(this);
@@ -449,8 +452,15 @@ void Puller::ProcessSemaphoreTriggerMethod(DmaPusher& dma_pusher) {
         // Registered before the fences run, so a release among them that meets the value counts
         // even if a later one overwrites it.
         auto& waiters = Nx2SemaphoreWaiters::Get();
-        if (const auto device = dma_pusher.memory_manager.GpuToCpuAddress(acquire.address);
-            device && !waiters.Add(this, *device, acquire.value, acquire.operation)) {
+        const auto device = dma_pusher.memory_manager.GpuToCpuAddress(acquire.address);
+        if (device && waiters.QueuedMatches(*device, acquire.value, acquire.operation)) {
+            // A GPU release earlier in command order meets it, its write waiting for a host
+            // fence. Ordering the host work suffices; waiting for the host GPU to run every
+            // fence cost the GPU thread about 7 ms per Ocarina of Time frame.
+            OnBack([rasterizer = dma_pusher.rasterizer] { rasterizer->WaitForIdle(); });
+            return;
+        }
+        if (device && !waiters.Add(this, *device, acquire.value, acquire.operation)) {
             if (static std::atomic<u32> full{}; full.fetch_add(1) < 8) {
                 LOG_ERROR(HW_GPU, "Channel {} waits on semaphore {:#x} unlatched: {} channels wait",
                           dma_pusher.channel_state.bind_id, acquire.address,

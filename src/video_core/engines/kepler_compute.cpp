@@ -12,7 +12,9 @@
 #include <cstring>
 #include <fstream>
 #include <optional>
+#include <set>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include "common/assert.h"
@@ -23,9 +25,11 @@
 #include "core/core.h"
 #include "video_core/gpu_split.h"
 #include "video_core/fire_emblem_upscale.h"
+#include "video_core/nx2_diag.h"
 #include "video_core/nx2_profile.h"
 #include "video_core/nx2.h"
 #include "video_core/engines/fermi_2d.h"
+#include "video_core/texture_cache/texture_cache_base.h"
 #include "video_core/engines/kepler_compute.h"
 #include "video_core/engines/native_upscale.h"
 #include "video_core/engines/maxwell_3d.h"
@@ -40,6 +44,37 @@
 #include "video_core/textures/decoders.h"
 
 namespace Tegra::Engines {
+
+namespace {
+
+struct QueuedRelease {
+    DAddr device{};
+    u32 value{};
+    bool queued{};
+};
+
+// Registers a fence-delayed release with the value it will write: releases are written in the
+// order this (GPU) thread queues them, so the last queued one, or memory, is its base.
+template <typename Reduce>
+QueuedRelease QueueRelease(MemoryManager& memory, GPUVAddr address, Reduce&& reduce) {
+    const auto device = memory.GpuToCpuAddress(address);
+    if (!device) {
+        return {};
+    }
+    auto& waiters = Nx2SemaphoreWaiters::Get();
+    const u32 value = reduce(waiters.LastQueued(*device).value_or(memory.Read<u32>(address)));
+    waiters.OnQueued(*device, value);
+    return {*device, value, true};
+}
+
+void RetireRelease(const QueuedRelease& release, u32 written) {
+    if (release.queued) {
+        Nx2SemaphoreWaiters::Verify(release.device, release.value, written);
+        Nx2SemaphoreWaiters::Get().OnRetired(release.device, release.value);
+    }
+}
+
+} // Anonymous namespace
 
 KeplerCompute::KeplerCompute(MemoryManager& memory_manager_)
     : memory_manager{memory_manager_}
@@ -114,9 +149,14 @@ void KeplerCompute::ProcessNativeReportSemaphore(u32 argument) {
     }
     if ((argument >> 3) & 1) {
         const u32 reduction = (argument >> 9) & 7;
-        rasterizer->SignalFence([this, address, payload, reduction] {
-            memory_manager.Write<u32>(address, ReduceSemaphore(reduction, false,
-                                                               memory_manager.Read<u32>(address), payload));
+        const auto queued = QueueRelease(memory_manager, address, [payload, reduction](u32 base) {
+            return ReduceSemaphore(reduction, false, base, payload);
+        });
+        rasterizer->SignalFence([this, address, payload, reduction, queued] {
+            const u32 value =
+                ReduceSemaphore(reduction, false, memory_manager.Read<u32>(address), payload);
+            memory_manager.Write<u32>(address, value);
+            RetireRelease(queued, value);
         });
         return;
     }
@@ -369,7 +409,10 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                 const bool four_words = (flags >> 30) == 0;
                 if (!memory_manager.IsFullyMappedRange(address, four_words ? 16 : sizeof(payload))) return false;
                 if (flags & (1U << 26)) {
-                    rasterizer->SignalFence([this, address, payload, flags] {
+                    const auto queued = QueueRelease(memory_manager, address, [payload, flags](u32 base) {
+                        return ReduceSemaphore((flags >> 20) & 7, (flags >> 24) & 1, base, payload);
+                    });
+                    rasterizer->SignalFence([this, address, payload, flags, queued] {
                         const auto combine = [&](u32 current) {
                             return ReduceSemaphore((flags >> 20) & 7, (flags >> 24) & 1, current, payload);
                         };
@@ -381,6 +424,7 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                                 *device, Tegra::Nx2MirrorShadow::Get().NoteCombinedRelease(
                                              *device, address, guest, value, combine));
                         }
+                        RetireRelease(queued, value);
                         static const u64 watch = [] {
                             const char* text = std::getenv("EDEN_NX2_SEM_WATCH");
                             return text ? u64{std::strtoull(text, nullptr, 16)} : u64{};
@@ -399,7 +443,10 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                     // NVN2 tracks QMD completion with a max release (bit 19) into a word other
                     // releases also advance: a plain write would move it backwards and leave
                     // GEQ acquires waiting forever.
-                    rasterizer->SignalFence([this, address, payload] {
+                    const auto queued = QueueRelease(memory_manager, address, [payload](u32 base) {
+                        return (std::max)(base, payload);
+                    });
+                    rasterizer->SignalFence([this, address, payload, queued] {
                         const auto combine = [payload](u32 current) { return (std::max)(current, payload); };
                         const u32 guest = memory_manager.Read<u32>(address);
                         const u32 value = combine(guest);
@@ -409,6 +456,7 @@ bool KeplerCompute::ProcessNativeMethod(Core::System& system, u32 method, u32 ar
                                 *device, Tegra::Nx2MirrorShadow::Get().NoteCombinedRelease(
                                              *device, address, guest, value, combine));
                         }
+                        RetireRelease(queued, value);
                     });
                 } else {
                     static const u64 watch = [] {
@@ -560,6 +608,10 @@ bool KeplerCompute::DispatchNativeCompute(const NativeQmdScheduler::Descriptor& 
         const u32 high = qmd[33 + slot * 2];
         if (high & 0x1ff00) {
             LOG_ERROR(HW_GPU, "Native compute constant address exceeds supported GPU width");
+            if (VideoCommon::Nx2Diag::CountersEnabled()) {
+                VideoCommon::Nx2Diag::Diagnostics::Get().Note(true, regs.code_loc.Address(), 0, "dropped", 0, 0,
+                                                              "constant address too wide");
+            }
             return false;
         }
         auto& buffer = launch_description.const_buffer_config[slot];
@@ -567,8 +619,50 @@ bool KeplerCompute::DispatchNativeCompute(const NativeQmdScheduler::Descriptor& 
         buffer.address_high.Assign(high & 0xff);
         buffer.size.Assign(((high >> 19) & 0x1fff) << 4);
     }
-    if (!launch_description.block_dim_x || !launch_description.block_dim_y || !launch_description.block_dim_z)
+    const u64 diag_code = regs.code_loc.Address();
+    const u32 diag_groups = launch_description.grid_dim_x.Value() * launch_description.grid_dim_y.Value() *
+                            launch_description.grid_dim_z.Value();
+    const u32 diag_threads = launch_description.block_dim_x.Value() * launch_description.block_dim_y.Value() *
+                             launch_description.block_dim_z.Value();
+    const auto diag_note = [&](std::string_view outcome, std::string_view detail = {}) {
+        namespace Diag = VideoCommon::Nx2Diag;
+        if (!Diag::Active()) {
+            return;
+        }
+        auto& diag = Diag::Diagnostics::Get();
+        diag.Touch('c', diag_code, outcome, diag_groups, diag_threads, 0, 0);
+        if (const u64 key = diag.ProgramKey(diag_code); diag.Inspecting(key)) {
+            for (u32 slot = 0; slot < NumConstBuffers; ++slot) {
+                const auto& buffer = launch_description.const_buffer_config[slot];
+                std::vector<u32> words(std::min<u32>(buffer.size.Value(), 0x2000) / 4);
+                if ((launch_description.const_buffer_enable_mask.Value() >> slot) & 1 && !words.empty() &&
+                    memory_manager.IsFullyMappedRange(buffer.Address(), words.size() * 4)) {
+                    memory_manager.ReadBlockUnsafe(buffer.Address(), words.data(), words.size() * 4);
+                    diag.Observe(key, slot, words);
+                }
+            }
+        }
+        if (Diag::CountersEnabled()) {
+            diag.Note(true, diag_code, 0, outcome, diag_groups, diag_threads, detail);
+        }
+        if (diag.Capturing()) {
+            diag.Row(fmt::format("{}\tdispatch\t{:#x}\t0x0\t{}\t{}\t{}\t0\t0x0\t0\t0\t0x0\t0\t0\t0x0\tgrid={}x{}x{} block={}x{}x{}\t{:016x}\t0000000000000000",
+                                 diag.NextSeq(), diag_code, outcome, diag_threads, diag_groups,
+                                 launch_description.grid_dim_x.Value(), launch_description.grid_dim_y.Value(),
+                                 launch_description.grid_dim_z.Value(), launch_description.block_dim_x.Value(),
+                                 launch_description.block_dim_y.Value(), launch_description.block_dim_z.Value(),
+                                 diag.ProgramKey(diag_code)));
+        }
+    };
+    if (!launch_description.block_dim_x || !launch_description.block_dim_y || !launch_description.block_dim_z) {
+        diag_note("dropped", "zero block dimension");
         return false;
+    }
+    if (VideoCommon::Nx2Diag::Ablates() &&
+        VideoCommon::Nx2Diag::Diagnostics::Get().Ablated('c', diag_code)) {
+        diag_note("ablated");
+        return false;
+    }
     dlss_chain.output_pass = false;
     // Fortune's Weave's evaluation is 13 dispatches. Bound incomplete evaluations, including
     // skipped dispatches, so a missing output pass cannot keep the chain active indefinitely.
@@ -726,9 +820,12 @@ bool KeplerCompute::DispatchNativeCompute(const NativeQmdScheduler::Descriptor& 
     bool dispatched = true;
     try {
         rasterizer->DispatchCompute();
+        diag_note("ok");
     } catch (const VideoCommon::FireEmblemUpscale::DispatchReplaced&) {
+        diag_note("replaced");
         return true;
     } catch (const Shader::Exception& error) {
+        diag_note("failed", error.what());
         if (Common::DkbFrameTrace::Enabled()) {
             static thread_local Common::DkbFrameTrace::RateLimit limit;
             static thread_local u64 rejected{};
@@ -754,8 +851,15 @@ bool KeplerCompute::DispatchNativeCompute(const NativeQmdScheduler::Descriptor& 
         } else if (std::string_view{error.what()}.find("matrix multiply") !=
                    std::string_view::npos) {
             DescribeNativeResources(qmd);
+            if (Settings::GetCurrentProgramID() == 0x0400C3F00006E000ULL) {
+                FollowPhotoUpscale();
+                return UpscaleFromConstBuffers();
+            }
             LOG_ERROR(HW_GPU, "Native tensor dispatch is unsupported; no validated replacement was available");
         }
+    }
+    if (dispatched && !dlss_chain.active && photo_upscale.window_left != 0) {
+        UpscaleFromConstBuffers();
     }
     if (dlss_chain.output_pass) {
         return FinishDlssEvaluation() || dispatched;
@@ -1399,6 +1503,176 @@ bool KeplerCompute::TryFireEmblemUpscale(bool allow_history) {
                  output->Width(), output->Height(), jitter->offset[0], jitter->offset[1]);
     }
     return done;
+}
+
+bool KeplerCompute::ReadConstBufferWords(u32 slot, std::vector<u32>& words) const {
+    words.clear();
+    const auto& cbuf = launch_description.const_buffer_config[slot];
+    const GPUVAddr address = (GPUVAddr{cbuf.address_high} << 32) | cbuf.address_low;
+    const u32 size = (std::min)(static_cast<u32>(cbuf.size.Value()), 0x2000U);
+    if (address == 0 || size < sizeof(u32) || !memory_manager.IsFullyMappedRange(address, size)) {
+        return false;
+    }
+    words.resize(size / sizeof(u32));
+    memory_manager.ReadBlockUnsafe(address, words.data(), words.size() * sizeof(u32));
+    return true;
+}
+
+namespace {
+bool PhotoUpscaleEnabled() {
+    static const bool enabled = [] {
+        const char* value = std::getenv("EDEN_NX2_PHOTO_UPSCALE");
+        return value == nullptr || value[0] != '0';
+    }();
+    return enabled;
+}
+
+std::optional<Tegra::RenderTargetFormat> ColorRenderFormat(Texture::TextureFormat format) {
+    using RTFormat = Tegra::RenderTargetFormat;
+    switch (format) {
+    case Texture::TextureFormat::A2B10G10R10: return RTFormat::A2B10G10R10_UNORM;
+    case Texture::TextureFormat::A8B8G8R8: return RTFormat::A8B8G8R8_UNORM;
+    case Texture::TextureFormat::B10G11R11: return RTFormat::B10G11R11_FLOAT;
+    case Texture::TextureFormat::R16G16B16A16: return RTFormat::R16G16B16A16_FLOAT;
+    default: return std::nullopt;
+    }
+}
+
+Fermi2D::Surface BlockLinearSurface(const Texture::TICEntry& tic, Tegra::RenderTargetFormat format) {
+    Fermi2D::Surface result{};
+    result.format = format;
+    result.linear = Fermi2D::MemoryLayout::BlockLinear;
+    result.block_width.Assign(tic.block_width);
+    result.block_height.Assign(tic.block_height);
+    result.block_depth.Assign(tic.block_depth);
+    result.depth = 1;
+    result.width = tic.Width();
+    result.height = tic.Height();
+    result.addr_upper = static_cast<u32>(tic.Address() >> 32);
+    result.addr_lower = static_cast<u32>(tic.Address());
+    return result;
+}
+
+constexpr u32 PHOTO_UPSCALE_WATCH_DISPATCHES = 64;
+} // Anonymous namespace
+
+// Mario Kart World docked draws its photo mode at 2560x1440 and upscales it to 3840x2160 with a
+// network of tensor-core passes. Without it the 4K image stays empty and only the UI drawn over it
+// shows. The first rejected pass of an evaluation starts a window of dispatches in which a pass
+// with both images in its constant buffers has its result replaced by a blit of one to the other.
+void KeplerCompute::FollowPhotoUpscale() {
+    if (PhotoUpscaleEnabled() && photo_upscale.window_left == 0) {
+        photo_upscale.window_left = PHOTO_UPSCALE_WATCH_DISPATCHES;
+        ++photo_upscale.evaluations;
+    }
+}
+
+bool KeplerCompute::UpscaleFromConstBuffers() {
+    auto& watch = photo_upscale;
+    if (!PhotoUpscaleEnabled() || watch.window_left == 0) {
+        return false;
+    }
+    const GPUVAddr program = regs.code_loc.Address();
+    // Once the pass that has both images is known, only it is looked at, at the same places; until
+    // then every constant buffer is searched, for a few evaluations.
+    const bool known = watch.output_program != 0;
+    if ((known && program != watch.output_program) || (!known && watch.evaluations > 6)) {
+        return false;
+    }
+    --watch.window_left;
+    struct Image {
+        Texture::TICEntry tic;
+        u32 slot;
+        u32 offset;
+    };
+    std::vector<Image> images;
+    std::vector<u32> words;
+    const auto add = [&](u32 slot, u32 offset, u32 word) {
+        const u32 tic_index = word & 0xfffff;
+        if (word == 0 || tic_index == 0 || tic_index > regs.tic.limit) {
+            return;
+        }
+        const auto tic = GetTICEntry(tic_index);
+        const bool plain_2d = tic.texture_type == Texture::TextureType::Texture2D ||
+                              tic.texture_type == Texture::TextureType::Texture2DNoMipmap;
+        if (!plain_2d || tic.Address() == 0 || !tic.IsBlockLinear() || tic.Width() < 1280 ||
+            !ColorRenderFormat(tic.format) ||
+            std::ranges::any_of(images, [&](const auto& image) {
+                return image.tic.Address() == tic.Address();
+            })) {
+            return;
+        }
+        images.push_back({tic, slot, offset});
+    };
+    if (known) {
+        if (ReadConstBufferWords(watch.slot, words)) {
+            for (const u32 offset : {watch.input_offset, watch.output_offset}) {
+                if (offset / sizeof(u32) < words.size()) {
+                    add(watch.slot, offset, words[offset / sizeof(u32)]);
+                }
+            }
+        }
+    } else {
+        std::unordered_set<u32> tried;
+        for (u32 slot = 0; slot < NumConstBuffers; ++slot) {
+            if (!ReadConstBufferWords(slot, words)) {
+                continue;
+            }
+            for (u32 i = 0; i < words.size(); ++i) {
+                if (tried.insert(words[i]).second) {
+                    add(slot, i * sizeof(u32), words[i]);
+                }
+            }
+        }
+    }
+    for (const auto& from : images) {
+        for (const auto& to : images) {
+            // The same picture at 1.5 times the size (2560x1440 to 3840x2160).
+            if (to.tic.Width() * 2 != from.tic.Width() * 3 ||
+                to.tic.Height() * 2 != from.tic.Height() * 3) {
+                continue;
+            }
+            const Fermi2D::Config config{
+                .operation = Fermi2D::Operation::SrcCopy,
+                .filter = Fermi2D::Filter::Bilinear,
+                .must_accelerate = true,
+                .dst_x0 = 0,
+                .dst_y0 = 0,
+                .dst_x1 = static_cast<s32>(to.tic.Width()),
+                .dst_y1 = static_cast<s32>(to.tic.Height()),
+                .src_x0 = 0,
+                .src_y0 = 0,
+                .src_x1 = static_cast<s32>(from.tic.Width()),
+                .src_y1 = static_cast<s32>(from.tic.Height()),
+            };
+            const bool done = rasterizer->AccelerateSurfaceCopy(
+                BlockLinearSurface(from.tic, *ColorRenderFormat(from.tic.format)),
+                BlockLinearSurface(to.tic, *ColorRenderFormat(to.tic.format)), config);
+            if (from.tic.Address() != watch.last_input || to.tic.Address() != watch.last_output) {
+                watch.last_input = from.tic.Address();
+                watch.last_output = to.tic.Address();
+                LOG_INFO(HW_GPU,
+                         "Photo upscale: program {:#x} cbuf{}+{:#x} {:#x} {}x{} format {:#x} "
+                         "-> cbuf{}+{:#x} {:#x} {}x{} format {:#x}: {}",
+                         program, from.slot, from.offset,
+                         from.tic.Address(), from.tic.Width(), from.tic.Height(),
+                         static_cast<u32>(from.tic.format.Value()), to.slot, to.offset,
+                         to.tic.Address(), to.tic.Width(), to.tic.Height(),
+                         static_cast<u32>(to.tic.format.Value()), done ? "blitted" : "not accelerated");
+            }
+            if (done) {
+                if (!known && from.slot == to.slot) {
+                    watch.output_program = program;
+                    watch.slot = from.slot;
+                    watch.input_offset = from.offset;
+                    watch.output_offset = to.offset;
+                }
+                watch.window_left = 0;
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void KeplerCompute::ProcessLaunch() {

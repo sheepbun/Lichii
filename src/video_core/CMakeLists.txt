@@ -122,6 +122,9 @@ add_library(video_core STATIC
     nx2_debug_control.h
     nx2_fast_draw.cpp
     nx2_fast_draw.h
+    nx2_late_read.cpp
+    nx2_late_read.h
+    nx2_diag.h
     nx2_profile.h
     nx2_stutter_trace.cpp
     nx2_stutter_trace.h

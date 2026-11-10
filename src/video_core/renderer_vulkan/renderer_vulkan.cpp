@@ -250,17 +250,28 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
                                swapchain.GetImageViewFormat());
 
 #ifdef HAS_LSFG
-    void(frame_gen.WantedGenerations(present_manager.MaxExtraFrames()));
+    // Only into frames free now: waiting here for the swapchain to show older ones held up the
+    // GPU thread and the game with it (Ocarina in Hyrule Field at a 170 FPS target: 25.0 FPS
+    // while panning, 27.2 without the wait).
+    void(frame_gen.WantedGenerations(present_manager.MaxExtraFrames(),
+                                     present_manager.FreeFrames()));
 
     frame_gen.Process(device, frame, present_manager.SwapchainImageFormat(),
                       GuestExtent(framebuffers));
 
     const size_t generated_frames = frame_gen.GeneratedFrameCount();
+    const std::chrono::nanoseconds spacing = frame_gen.OutputSpacing();
+    frame->batch_start = generated_frames == 0;
+    frame->real = true;
+    frame->present_offset = spacing * generated_frames;
     for (size_t generation = 0; generation < generated_frames; ++generation) {
         Frame* generated = present_manager.GetRenderFrame();
+        generated->batch_start = generation == 0;
+        generated->real = false;
+        generated->present_offset = spacing * generation;
         blit_swapchain.PrepareFrame(device, generated, render_window.GetFramebufferLayout());
         frame_gen.GenerateInto(device, generated, generation);
-        scheduler.Flush(*generated->render_ready);
+        frame_gen.Submit(generated, generation);
         present_manager.Present(generated);
     }
 #endif
@@ -268,7 +279,11 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     if (trace) {
         scheduler.MarkFrameEnd(++trace_frame);
     }
+#ifdef HAS_LSFG
+    frame_gen.Submit(frame, generated_frames);
+#else
     scheduler.Flush(*frame->render_ready);
+#endif
 
     const auto presenting = trace ? std::chrono::steady_clock::now()
                                   : std::chrono::steady_clock::time_point{};

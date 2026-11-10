@@ -289,15 +289,35 @@ void QueryCacheBase<Traits>::CounterReport(GPUVAddr addr, QueryType counter_type
     // Written later: the buffer cache keeps GPU writes over it until then (NoteReportPending).
     const bool report_noted =
         !immediate && impl->rasterizer.NoteReportPending(cpu_addr, report_size);
+    // A payload release written once a host fence passes: acquires behind it in command order
+    // may proceed before then (Nx2SemaphoreWaiters).
+    const bool queued_release =
+        counter_type == QueryType::Payload && (is_fence || Settings::IsGPULevelHigh());
+    if (queued_release) {
+        Tegra::Nx2SemaphoreWaiters::Get().OnQueued(cpu_addr, payload);
+    }
     std::function<void()> operation([this, streamer, query_base = query, query_location,
                                      pointer, pointer_timestamp, cpu_addr, addr,
                                      asid = gpu_memory->GetID(), counter_type, mirrored,
-                                     report_size, report_noted] {
+                                     report_size, report_noted, queued_release, payload] {
         SCOPE_EXIT {
             if (report_noted) {
                 impl->rasterizer.FinishReport(cpu_addr, report_size);
             }
         };
+        // Retired once the memory holds the value (or the write is dropped), on every return.
+        struct Retire {
+            bool queued;
+            DAddr address;
+            u32 value;
+            std::optional<u32> written;
+            ~Retire() {
+                if (queued) {
+                    Tegra::Nx2SemaphoreWaiters::Verify(address, value, written);
+                    Tegra::Nx2SemaphoreWaiters::Get().OnRetired(address, value);
+                }
+            }
+        } retire{queued_release, cpu_addr, payload, std::nullopt};
         if (True(query_base->flags & QueryFlagBits::IsInvalidated)) {
             if (const u64 trace = QueryTrace::Sample(QueryTrace::Event::Discard)) {
                 LOG_INFO(HW_GPU,
@@ -342,6 +362,7 @@ void QueryCacheBase<Traits>::CounterReport(GPUVAddr addr, QueryType counter_type
             shadow.NoteDirectRelease(cpu_addr, addr);
         }
         Tegra::Nx2SemaphoreWaiters::Get().OnWrite(cpu_addr, static_cast<u32>(query_base->value));
+        retire.written = static_cast<u32>(query_base->value);
         if (const u64 trace = QueryTrace::Sample(QueryTrace::Event::Write)) {
             const bool wide = True(query_base->flags & QueryFlagBits::HasTimestamp);
             LOG_INFO(HW_GPU,

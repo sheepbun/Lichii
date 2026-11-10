@@ -413,7 +413,10 @@ size_t FrameGenMaxGenerations() {
         return 0;
     }
     if (values.frame_gen_target_rate.GetValue() != 0) {
-        return MAX_FRAME_GEN_MULTIPLIER - 1;
+        // Enough to fill a high refresh rate from a low game frame rate (6 is the most the 7
+        // present frames in flight allow).
+        constexpr size_t TARGET_RATE_GENERATIONS = 6;
+        return TARGET_RATE_GENERATIONS;
     }
     return FrameGenMultiplier() - 1;
 }

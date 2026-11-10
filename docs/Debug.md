@@ -8,16 +8,13 @@ When reporting issues or finding bugs, we often need backtraces, debug logs, or 
 
 If your bug is related to a graphical issue -- e.g. mismatched colors, vertex explosions, flickering, etc. -- then you are required to include graphical debugging logs in your issue reports.
 
-Graphics Debugging is found in General -> Debug on desktop, and Advanced Settings -> Debug on Android. Android users are all set; however, desktop users may need to install the Vulkan Validation Layers:
-
-- Windows: Install the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home)
-- Linux, BSD, etc: Install `vulkan-validation-layers`, `vulkan-layers`, or similar from your package manager. It should be located in e.g. `/usr/lib64/libVkLayer_khronos_validation.so`
+Graphics Debugging is found in General -> Debug. It needs the Vulkan Validation Layers: `sudo pacman -S vulkan-validation-layers`.
 
 Once Graphics Debugging is enabled, run the problematic game again and continue. Note that the game may run extremely slow on weak hardware.
 
 ### Debug Logs
 
-Debug logs can be found in `General -> Debug -> Open Log Location` on desktop, and `Share Debug Logs` on Android. This MUST be included in all bug reports, except for certain UI bugs -- but we still highly recommend them even for UI bugs.
+Debug logs can be found in `General -> Debug -> Open Log Location`, or at `~/.local/share/eglantine/log/eden_log.txt`. This MUST be included in all bug reports, except for certain UI bugs -- but we still highly recommend them even for UI bugs.
 
 ## Debugging (host code)
 
@@ -30,13 +27,7 @@ Ignoring SIGSEGV when debugging in host:
 
 ### gdb
 
-You must have GDB installed for aarch64 to debug the target. Install it through your package manager, e.g.:
-
-- On Arch:
-  - `sudo pacman -Syu aarch64-linux-gnu-gdb`
-- On Gentoo:
-  - `sudo emerge --ask crossdev`
-  - `sudo crossdev -t aarch64-unknown-linux-gnu --ex-gdb`
+You must have GDB installed for aarch64 to debug the target: `sudo pacman -Syu aarch64-linux-gnu-gdb`.
 
 Run `./build/bin/eden-cli -c <path to your config file (see logs where you run Eden normally to see where it is)> -d -g <path to game>`, or `Enable GDB Stub` at General > Debug, then hook up an aarch64-gdb:
 
@@ -75,21 +66,17 @@ RenderDoc is a free, cross platform, multi-graphics API debugger. It is an inval
 
 RenderDoc can capture Eden's Vulkan output when its Vulkan layer is loaded before Eden creates the Vulkan device. Before using RenderDoc to diagnose issues, it's always good to make sure there are no validation errors. Any errors means the behavior of the application is undefined. That said, RenderDoc can help debug validation errors if you do have them.
 
-## Usage on Windows 
+## Usage
 
-You can either use RenderDoc UI to launch Eden, or you can make Eden attach it internally:
+Install it with `sudo pacman -S renderdoc`. You can either use the RenderDoc UI (`qrenderdoc`) to launch Lichii, or enable RenderDoc's Vulkan layer for one run:
 
-On Windows PowerShell:
-```powershell
-$env:ENABLE_VULKAN_RENDERDOC_CAPTURE='1'
-.\eden.exe
-```
-When RenderDoc is attached, Eden logs the default Windows capture folder:
-```text
-%LOCALAPPDATA%\Temp\RenderDoc
+```sh
+ENABLE_VULKAN_RENDERDOC_CAPTURE=1 ./build/bin/lichii
 ```
 
-Press RenderDoc's capture hotkey, usually `F12`, to capture a frame. To stop using RenderDoc, close Eden and launch it again without `ENABLE_VULKAN_RENDERDOC_CAPTURE`.
+Captures go to `/tmp/RenderDoc` by default.
+
+Press RenderDoc's capture hotkey, usually `F12`, to capture a frame. To stop using RenderDoc, close Lichii and launch it again without `ENABLE_VULKAN_RENDERDOC_CAPTURE`.
 
 ## Eden Hotkey
 

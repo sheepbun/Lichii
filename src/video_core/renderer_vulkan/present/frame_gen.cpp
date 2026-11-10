@@ -2,13 +2,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
+#include <cstdlib>
+#include <fstream>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "common/fs/file.h"
 #include "common/fs/fs.h"
 #include "common/fs/path_util.h"
+#include "common/logging.h"
 #include "common/settings.h"
+#include "common/stb.h"
 #include "video_core/renderer_vulkan/present/frame_gen.h"
 #include "video_core/renderer_vulkan/present/util.h"
 #include "video_core/renderer_vulkan/vk_present_manager.h"
@@ -187,6 +193,11 @@ void CopyPresentedFrame(vk::CommandBuffer cmdbuf, VkImage source, LsfgImage& des
     destination.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
 }
 
+const char* PresentDumpDirectory() {
+    static const char* const directory = std::getenv("EDEN_NX2_FRAME_GEN_DUMP");
+    return directory;
+}
+
 } // Anonymous namespace
 
 FrameGen::FrameGen(MemoryAllocator& memory_allocator_, Scheduler& scheduler_)
@@ -197,6 +208,8 @@ FrameGen::~FrameGen() = default;
 void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
                        VkExtent2D guest_extent) {
     generated = false;
+    present_format = format;
+    PollPresentDump();
 
     if (!shaders) {
         shaders.emplace(device);
@@ -271,17 +284,29 @@ void FrameGen::Process(const Device& device, Frame* frame, VkFormat format,
     }
 }
 
-size_t FrameGen::WantedGenerations(size_t capacity) {
+size_t FrameGen::WantedGenerations(size_t capacity, size_t available) {
     if (unavailable) {
         plan = {};
         return 0;
     }
     plan = pacer.Plan(capacity);
+    plan.generations = (std::min)(plan.generations, available);
     return plan.generations;
 }
 
 size_t FrameGen::GeneratedFrameCount() const {
     return generated ? last_generations : 0;
+}
+
+std::chrono::nanoseconds FrameGen::OutputSpacing() const {
+    const size_t outputs = GeneratedFrameCount() + 1;
+    if (outputs == 1) {
+        return {};
+    }
+    // Leave room for the next game frame arriving a little early.
+    constexpr f32 MARGIN = 0.9f;
+    const f32 seconds = pacer.SmoothedInterval() * MARGIN / static_cast<f32>(outputs);
+    return std::chrono::nanoseconds{static_cast<s64>(seconds * 1e9f)};
 }
 
 void FrameGen::GenerateInto(const Device& device, Frame* destination, size_t generation) {
@@ -308,6 +333,73 @@ void FrameGen::GenerateInto(const Device& device, Frame* destination, size_t gen
                                       extent);
         });
     }
+}
+
+void FrameGen::PollPresentDump() {
+    present_dump_active = false;
+    const char* const directory = PresentDumpDirectory();
+    if (directory == nullptr) {
+        return;
+    }
+    if (present_dump_left == 0 && ++present_dump_poll % 30 == 0) {
+        const std::filesystem::path burst = std::filesystem::path{directory} / "burst";
+        std::ifstream file{burst};
+        u32 count = 0;
+        if (file >> count) {
+            file.close();
+            std::error_code ignored;
+            std::filesystem::remove(burst, ignored);
+            present_dump_left = count;
+            LOG_INFO(Render_Vulkan, "Frame generation dump: the next {} real frames to {}", count,
+                     directory);
+        }
+    }
+    if (present_dump_left > 0) {
+        --present_dump_left;
+        ++present_dump_frame;
+        present_dump_active = true;
+    }
+}
+
+void FrameGen::Submit(Frame* frame, size_t position) {
+    if (!present_dump_active) {
+        scheduler.Flush(*frame->render_ready);
+        return;
+    }
+    const VkExtent2D extent{.width = frame->width, .height = frame->height};
+    const VkDeviceSize size = static_cast<VkDeviceSize>(extent.width) * extent.height * 4;
+    vk::Buffer buffer = CreateWrappedBuffer(memory_allocator, size, MemoryUsage::Download);
+    scheduler.RequestOutsideRenderPassOperationContext();
+    scheduler.Record([image = *frame->image, dst = *buffer, extent](vk::CommandBuffer cmdbuf) {
+        DownloadColorImage(cmdbuf, image, dst,
+                           VkExtent3D{.width = extent.width, .height = extent.height, .depth = 1});
+    });
+    scheduler.Finish(*frame->render_ready);
+    buffer.Invalidate();
+    const std::span<u8> mapped = buffer.Mapped();
+    const bool blue_first = IsBlueFirst(present_format);
+    std::vector<u8> rgb(static_cast<size_t>(extent.width) * extent.height * 3);
+    for (size_t i = 0; i < rgb.size() / 3; ++i) {
+        rgb[i * 3] = mapped[i * 4 + (blue_first ? 2 : 0)];
+        rgb[i * 3 + 1] = mapped[i * 4 + 1];
+        rgb[i * 3 + 2] = mapped[i * 4 + (blue_first ? 0 : 2)];
+    }
+    std::vector<u8> png;
+    const auto append = [](void* context, void* data, int length) {
+        auto* out = static_cast<std::vector<u8>*>(context);
+        const auto* bytes = static_cast<const u8*>(data);
+        out->insert(out->end(), bytes, bytes + length);
+    };
+    if (!stbi_write_png_to_func(append, &png, static_cast<int>(extent.width),
+                                static_cast<int>(extent.height), 3, rgb.data(),
+                                static_cast<int>(extent.width) * 3)) {
+        return;
+    }
+    const std::filesystem::path path =
+        std::filesystem::path{PresentDumpDirectory()} /
+        fmt::format("{:06}_{}.png", present_dump_frame, position);
+    std::ofstream{path, std::ios::binary}.write(reinterpret_cast<const char*>(png.data()),
+                                                static_cast<std::streamsize>(png.size()));
 }
 
 void FrameGen::Rebuild(const Device& device, VkExtent2D extent, VkFormat format, f32 flow_scale) {

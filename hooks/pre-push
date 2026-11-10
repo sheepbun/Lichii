@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Contributions from this fork are pushed only to sheepbun/Lichii (see CONTRIBUTING.md).
+# Install: cp hooks/pre-push "$(git rev-parse --git-common-dir)/hooks/pre-push"
+
+url=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+url=${url%/}
+url=${url%.git}
+
+case $url in
+    https://github.com/sheepbun/lichii | git@github.com:sheepbun/lichii | ssh://git@github.com/sheepbun/lichii)
+        exit 0
+        ;;
+esac
+
+cat >&2 <<EOF
+Error: refusing to push to $2.
+Contributions from this fork are pushed only to https://github.com/sheepbun/Lichii.git (remote origin).
+EOF
+exit 1

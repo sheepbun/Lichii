@@ -66,6 +66,8 @@ public:
     /// Binds a rasterizer to this engine.
     void BindRasterizer(VideoCore::RasterizerInterface* rasterizer);
 
+    /// Whether a write to `method` can write memory (a dispatch, upload or report): with the
+    /// native class, every method besides those that only store their value; macros always.
     [[nodiscard]] bool MayWriteMemory(u32 method) const {
         if (method >= native_plain_methods.size()) {
             return true;
@@ -74,15 +76,20 @@ public:
     }
 
     /// The channel's MME data RAM, shared with its 3D engine.
-    void SetNativeDataRam(std::array<u32, 0xc00>* data_ram) { native_data_ram = data_ram; }
-    void SetNativeMacroMode(MacroEngine* shared_macro, std::span<u32> positions, NativeMacroContext* context = nullptr) {
-        if (native_context != context) native_compute_uploaded = false;
+    void SetNativeDataRam(std::array<u32, 0xc00>* data_ram) {
+        native_data_ram = data_ram;
+    }
+    void SetNativeMacroMode(MacroEngine* shared_macro, std::span<u32> positions,
+                            NativeMacroContext* context = nullptr) {
+        if (native_context != context)
+            native_compute_uploaded = false;
         native_context = context;
         native_mode = shared_macro != nullptr;
         upload_state.SetNativePartialTransfers(native_mode);
         native_macro = shared_macro;
         native_macro_positions = positions;
-        if (native_mode) execution_mask.set();
+        if (native_mode)
+            execution_mask.set();
         else {
             execution_mask.reset();
             execution_mask[KEPLER_COMPUTE_REG_INDEX(exec_upload)] = true;
@@ -242,10 +249,12 @@ public:
                   "KeplerCompute LaunchParams has wrong size");
 
     /// Write the value to the register identified by method.
-    void CallMethod(Core::System& system, u32 method, u32 method_argument, bool is_last_call) override;
+    void CallMethod(Core::System& system, u32 method, u32 method_argument,
+                    bool is_last_call) override;
 
     /// Write multiple values to the register identified by method.
-    void CallMultiMethod(Core::System& system, u32 method, const u32* base_start, u32 amount, u32 methods_pending) override;
+    void CallMultiMethod(Core::System& system, u32 method, const u32* base_start, u32 amount,
+                         u32 methods_pending) override;
 
     std::optional<GPUVAddr> GetIndirectComputeAddress() const {
         return indirect_compute;
@@ -262,7 +271,9 @@ public:
     /// GPU thread split with macros on its front half (gpu_split.h, EDEN_NX2_SPLIT=2), called by
     /// the front instead of CallMethod for native compute engines: runs their macros and macro
     /// uploads against a copy of the registers and sends the register writes to the back.
-    bool FrontRunsMacros() const { return native_mode; }
+    bool FrontRunsMacros() const {
+        return native_mode;
+    }
     void FrontCallMethod(Core::System& system, VideoCommon::GpuSplit& split, u32 method,
                          u32 argument, bool is_last_call, const GPUVAddr* segment);
     void FrontCallMultiMethod(Core::System& system, VideoCommon::GpuSplit& split, u32 method,
@@ -295,6 +306,9 @@ private:
     void UpdateGameDlssStatus(bool complete, VideoCore::GameDlssReason blocker);
     std::pair<std::vector<u32>, std::vector<u32>> NativeImageHandles(GPUVAddr program);
     void RememberNativeUpscaleInput();
+    bool ReadConstBufferWords(u32 slot, std::vector<u32>& words) const;
+    void FollowPhotoUpscale();
+    bool UpscaleFromConstBuffers();
 
     /// This frame's DLSS evaluation (Fortune's Weave): whether its passes all ran, and whether
     /// the game's own network output is shown instead of the replacement upscale.
@@ -334,6 +348,21 @@ private:
     u32 network_skip_remaining{};
     /// Set when the replacement copy fails, so the full network runs from then on.
     bool native_upscale_disabled{};
+
+    /// Mario Kart World's docked photo mode upscales 2560x1440 to 3840x2160 with a tensor-core
+    /// network whose passes can't run. After its first rejected pass the next dispatches are
+    /// searched for a pass that has both images in its constant buffers.
+    struct PhotoUpscale {
+        u32 window_left{};
+        u32 evaluations{};
+        GPUVAddr last_input{};
+        GPUVAddr last_output{};
+        /// The pass that has both images and where in its constant buffer, once found.
+        GPUVAddr output_program{};
+        u32 slot{};
+        u32 input_offset{};
+        u32 output_offset{};
+    } photo_upscale;
 
     /// Motion vectors and depth of Fire Emblem: Fortune's Weave's DLSS evaluation, from its first
     /// pass (run earlier in the frame than the network pass the stand-in replaces), with the input

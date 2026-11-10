@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <type_traits>
 #include "common/container/unordered_map.h"
 #include <vector>

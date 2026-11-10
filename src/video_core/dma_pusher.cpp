@@ -30,6 +30,7 @@
 #include "video_core/memory_manager.h"
 #include "video_core/nx2.h"
 #include "video_core/nx2_cmdpage_diag.h"
+#include "video_core/nx2_late_read.h"
 #include "video_core/rasterizer_interface.h"
 
 namespace Tegra {
@@ -174,6 +175,9 @@ bool DmaPusher::Step() {
     }
 
     CommandList& command_list = dma_pushbuffer.front();
+    if (VideoCommon::Nx2LateRead::Enabled()) {
+        VideoCommon::Nx2LateRead::SetListEpoch(command_list.late_read_epoch);
+    }
 
     const size_t prefetch_size = command_list.prefetch_command_list.size();
     const size_t command_list_size = command_list.command_lists.size();
@@ -269,7 +273,7 @@ bool DmaPusher::Step() {
         }
         // A resumed entry is read again: the words after the acquire may be new by now.
         // A safe read flushes the caches, which belong to the split's back thread while it runs
-        // (the split only starts with unsafe reads; the settings can change mid-game).
+        // (the split does not run with Safe DMA; the settings can change mid-game).
         const bool use_safe = !VideoCommon::GpuSplit::Get().Active() &&
                               (Settings::IsDMALevelDefault() ? Settings::IsGPULevelHigh() : Settings::IsDMALevelSafe());
         // Pages no GPU work has written yet may still get the list from compute or copy work
@@ -390,6 +394,8 @@ bool DmaPusher::Step() {
     }
 
     if (signal_sync) {
+        // SignalFence invalidates the GPU caches, which can record copies into the scheduler: the
+        // back's state, which a drained back still submits from in its idle hook.
         VideoCommon::GpuSplit::Get().Run([this] {
             rasterizer->SignalFence([this]() {
                 std::scoped_lock lk(sync_mutex);
@@ -401,6 +407,25 @@ bool DmaPusher::Step() {
 
     return true;
 }
+
+// EDEN_NX2_SEM_WATCH=<gpu address>: log every method whose argument is the low word of an
+// address in the 16 bytes there (finds the engine and method that release a semaphore).
+static const u32 g_semaphore_watch = [] {
+    const char* value = std::getenv("EDEN_NX2_SEM_WATCH");
+    return value ? static_cast<u32>(std::strtoull(value, nullptr, 16)) : 0U;
+}();
+
+// LOCAL TEST (Zelda): EDEN_NX2_FRONT_BATCH=1 (see ProcessCommands).
+static bool FrontBatchEnabled() {
+    static const bool enabled = [] {
+        const char* value = std::getenv("EDEN_NX2_FRONT_BATCH");
+        return value != nullptr && value[0] == '1';
+    }();
+    return enabled;
+}
+
+// EDEN_NX2_PB_CHECK also keeps the last parsed entries, for DumpCurrentEntry.
+static const bool g_record_parsed_entries = std::getenv("EDEN_NX2_PB_CHECK") != nullptr;
 
 size_t DmaPusher::ProcessCommands(std::span<const CommandHeader> commands, size_t word_offset) {
     for (size_t index = 0; index < commands.size();) {
@@ -417,6 +442,36 @@ size_t DmaPusher::ProcessCommands(std::span<const CommandHeader> commands, size_
             dma_state.is_last_call = true;
             index += max_write;
         } else if (dma_state.method_count) {
+            // LOCAL TEST (Zelda), EDEN_NX2_FRONT_BATCH=1: with the split's front running the 3D
+            // engine (FrontCallMethod), a run of incrementing register writes goes to it in one
+            // call instead of CallMethod's per-word dispatch (engine lookup, writer and effect
+            // checks, Front()). A 3D register write can't suspend the channel, so the acquire
+            // check after the run is enough.
+            if (!dma_state.non_incrementing && !dma_increment_once &&
+                dma_state.method >= non_puller_methods && dma_state.method < MacroRegistersStart &&
+                g_semaphore_watch == 0 && FrontBatchEnabled()) {
+                auto& split = VideoCommon::GpuSplit::Get();
+                auto* const subchannel = subchannels[dma_state.subchannel];
+                if (subchannel != nullptr && split.Active() && split.FrontMacros() &&
+                    subchannel_type[dma_state.subchannel] == Engines::EngineTypes::Maxwell3D) {
+                    auto* const maxwell3d = static_cast<Engines::Maxwell3D*>(subchannel);
+                    const size_t available =
+                        (std::min)({size_t{dma_state.method_count}, commands.size() - index,
+                                    size_t{MacroRegistersStart - dma_state.method}});
+                    if (maxwell3d->GetNativeMacroEngine().native_turing && available > 1) {
+                        const u32 count = static_cast<u32>(available);
+                        const bool ends = count == dma_state.method_count;
+                        dma_state.dma_word_offset = u64((word_offset + index + count - 1) * sizeof(u32));
+                        dma_state.is_last_call = ends;
+                        maxwell3d->FrontWriteRun(system, split, dma_state.method,
+                                                 &commands[index].argument, count, ends);
+                        dma_state.method += count;
+                        dma_state.method_count -= count;
+                        index += count;
+                        continue;
+                    }
+                }
+            }
             // Fast-path batching for consecutive non-execution methods in increasing mode
             if (!dma_state.non_incrementing && !dma_increment_once &&
                 dma_state.method >= non_puller_methods &&

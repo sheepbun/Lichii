@@ -10,9 +10,12 @@
 #include <deque>
 #include <map>
 #include <optional>
+#include <span>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
@@ -495,6 +498,40 @@ std::optional<StorageBufferAddr> CbufWord(const IR::Inst* inst) {
     return StorageBufferAddr{.index = inst->Arg(0).U32(), .offset = inst->Arg(1).U32()};
 }
 
+/// The instructions the pass reads, in program order, from one walk over the program: a lowered
+/// native program holds tens of thousands of instructions, and each walk over them cost more than
+/// the analysis it fed.
+struct ProgramScan {
+    std::vector<std::pair<IR::Inst*, IR::Block*>> phis;
+    /// Phis and 32-bit additions, for CollectIteratorWords
+    std::vector<IR::Inst*> sums;
+    std::vector<std::pair<IR::Block*, IR::Inst*>> globals;
+    /// Global writes that return a value (atomics), for CollectAtomicPointers
+    std::vector<IR::Inst*> atomics;
+};
+
+ProgramScan ScanProgram(IR::Program& program) {
+    ProgramScan scan;
+    for (IR::Block* const block : program.post_order_blocks) {
+        for (IR::Inst& inst : block->Instructions()) {
+            const IR::Opcode opcode{inst.GetOpcode()};
+            if (opcode == IR::Opcode::Phi) {
+                scan.phis.emplace_back(&inst, block);
+                scan.sums.push_back(&inst);
+            } else if (opcode == IR::Opcode::IAdd32) {
+                scan.sums.push_back(&inst);
+            }
+            if (IsGlobalMemory(inst)) {
+                scan.globals.emplace_back(block, &inst);
+            }
+            if (IsGlobalMemoryWrite(inst) && inst.Type() != IR::Type::Void) {
+                scan.atomics.push_back(&inst);
+            }
+        }
+    }
+    return scan;
+}
+
 struct TrackingConditions {
     using Predicate = std::pair<IR::Value, bool>;
 
@@ -511,13 +548,10 @@ struct TrackingConditions {
     using BitKey = std::tuple<const IR::Inst*, u32, const IR::Inst*, int>;
     mutable std::map<BitKey, std::optional<Predicate>> bit_cache;
 
-    explicit TrackingConditions(IR::Program& program) {
-        for (IR::Block* block : program.post_order_blocks) {
-            for (IR::Inst& inst : block->Instructions()) {
-                if (inst.GetOpcode() == IR::Opcode::Phi) {
-                    owners.emplace(&inst, block);
-                }
-            }
+    TrackingConditions(IR::Program& program,
+                       std::span<const std::pair<IR::Inst*, IR::Block*>> phis) {
+        for (const auto& [phi, block] : phis) {
+            owners.emplace(phi, block);
         }
         std::vector<Scope> active;
         std::vector<IR::Block*> loop_stack;
@@ -836,23 +870,22 @@ bool SumWords(const IR::Value& value, const IR::Inst* loop, WordSum& sum) {
 /// Finds the constant buffer words that step strided iterators (CUTLASS-style kernel parameters):
 /// words added to a loop-carried value on its back edge, and words summed with two or more other
 /// words into an offset table. A base pointer is neither.
-StorageBufferSet CollectIteratorWords(IR::Program& program) {
+StorageBufferSet CollectIteratorWords(std::span<IR::Inst* const> sums,
+                                      std::span<const std::pair<IR::Inst*, IR::Block*>> phis) {
     StorageBufferSet result;
-    for (IR::Block* const block : program.post_order_blocks) {
-        for (IR::Inst& inst : block->Instructions()) {
-            if (inst.GetOpcode() == IR::Opcode::Phi) {
-                for (size_t arg = 0; arg < inst.NumArgs(); ++arg) {
-                    WordSum sum;
-                    SumWords(inst.Arg(arg), &inst, sum);
-                    if (sum.reaches_loop) {
-                        result.insert(sum.words.begin(), sum.words.end());
-                    }
-                }
-            } else if (inst.GetOpcode() == IR::Opcode::IAdd32) {
+    for (IR::Inst* const inst : sums) {
+        if (inst->GetOpcode() == IR::Opcode::Phi) {
+            for (size_t arg = 0; arg < inst->NumArgs(); ++arg) {
                 WordSum sum;
-                if (SumWords(IR::Value{&inst}, nullptr, sum) && sum.words.size() >= 3) {
+                SumWords(inst->Arg(arg), inst, sum);
+                if (sum.reaches_loop) {
                     result.insert(sum.words.begin(), sum.words.end());
                 }
+            }
+        } else {
+            WordSum sum;
+            if (SumWords(IR::Value{inst}, nullptr, sum) && sum.words.size() >= 3) {
+                result.insert(sum.words.begin(), sum.words.end());
             }
         }
     }
@@ -912,12 +945,8 @@ StorageBufferSet CollectIteratorWords(IR::Program& program) {
             }
         }
     };
-    for (IR::Block* block : program.post_order_blocks) {
-        for (IR::Inst& inst : block->Instructions()) {
-            if (inst.GetOpcode() == IR::Opcode::Phi) {
-                visit(visit, &inst);
-            }
-        }
+    for (const auto& [phi, block] : phis) {
+        visit(visit, phi);
     }
     return result;
 }
@@ -951,16 +980,14 @@ bool ReadsCbufWord(const IR::Value& condition, StorageBufferAddr word) {
 /// address apart from an immediate offset, or a 64-bit sum whose high half adds the pointer's high
 /// word and the carry out of its low word. An atomic has no global fallback, so such a pointer is a
 /// buffer even while it is unmapped. A 32-bit scalar added to a pointer carries nothing.
-StorageBufferSet CollectAtomicPointers(IR::Program& program) {
+StorageBufferSet CollectAtomicPointers(std::span<IR::Inst* const> atomics) {
     const auto word = [](const IR::U32& value) {
         return value.IsImmediate() ? std::nullopt : CbufWord(value.InstRecursive());
     };
     StorageBufferSet result;
-    for (IR::Block* const block : program.post_order_blocks) {
-        for (IR::Inst& inst : block->Instructions()) {
-            if (!IsGlobalMemoryWrite(inst) || inst.Type() == IR::Type::Void) {
-                continue;
-            }
+    for (IR::Inst* const atomic : atomics) {
+        IR::Inst& inst{*atomic};
+        {
             const std::optional<LowAddrInfo> addr{TrackLowAddress(&inst)};
             if (!addr) {
                 continue;
@@ -2076,30 +2103,22 @@ void Replace(IR::Block& block, IR::Inst& inst, const IR::U32& storage_index,
 
 void GlobalMemoryToStorageBufferPass(Environment& env, IR::Program& program,
                                      const HostTranslateInfo& host_info) {
-    const bool has_global_memory =
-        std::ranges::any_of(program.post_order_blocks, [](const auto* block) {
-            return std::ranges::any_of(block->Instructions(), IsGlobalMemory);
-        });
-    if (!has_global_memory) {
+    const ProgramScan scan{ScanProgram(program)};
+    if (scan.globals.empty()) {
         return;
     }
     const size_t max_ssbos{StorageBufferLimit(host_info)};
-    TrackingConditions conditions{program};
+    TrackingConditions conditions{program, scan.phis};
     StorageInfo info;
     // Without 64-bit integers the backend cannot route global accesses among bound buffers.
     info.bind_competing_loaded = host_info.support_int64;
-    info.iterator_words = CollectIteratorWords(program);
-    info.atomic_pointers = CollectAtomicPointers(program);
+    info.iterator_words = CollectIteratorWords(scan.sums, scan.phis);
+    info.atomic_pointers = CollectAtomicPointers(scan.atomics);
     const auto collect = [&] {
-        for (IR::Block* const block : program.post_order_blocks) {
-            for (IR::Inst& inst : block->Instructions()) {
-                if (!IsGlobalMemory(inst)) {
-                    continue;
-                }
-                conditions.current = block;
-                const bool bound{CollectStorageBuffers(*block, inst, info, env, conditions)};
-                info.untracked_writes |= !bound && IsGlobalMemoryWrite(inst);
-            }
+        for (const auto& [block, inst] : scan.globals) {
+            conditions.current = block;
+            const bool bound{CollectStorageBuffers(*block, *inst, info, env, conditions)};
+            info.untracked_writes |= !bound && IsGlobalMemoryWrite(*inst);
         }
     };
     collect();

@@ -6,11 +6,13 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstdlib>
 #include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -18,6 +20,7 @@
 
 #include "common/bit_util.h"
 #include "common/common_types.h"
+#include "common/logging.h"
 
 namespace Tegra {
 
@@ -548,6 +551,86 @@ public:
         return false;
     }
 
+    /// A GPU release recorded on the GPU thread that writes `value` to `device_address` once
+    /// the host GPU passes its fence. Releases are written in the order they are queued; the
+    /// write retires it (OnRetired, after the memory holds the value).
+    void OnQueued(u64 device_address, u32 value) {
+        std::scoped_lock lk{mutex};
+        // Each retires once the host GPU passes its fence, a few hundred at most in flight. More
+        // means some were dropped unwritten, and a stale one would end an acquire early.
+        if (queued.size() >= MaxQueued) {
+            queued.clear();
+        }
+        queued.push_back({device_address, value});
+        queued_count.store(queued.size(), std::memory_order_release);
+        for (Slot& slot : slots) {
+            if (slot.owner.load(std::memory_order_relaxed) != nullptr &&
+                slot.address == device_address && Matches(slot, value)) {
+                slot.latched.store(true, std::memory_order_release);
+            }
+        }
+    }
+
+    void OnRetired(u64 device_address, u32 value) {
+        std::scoped_lock lk{mutex};
+        const auto it = std::ranges::find_if(queued, [&](const Queued& q) {
+            return q.address == device_address && q.value == value;
+        });
+        if (it != queued.end()) {
+            queued.erase(it);
+        }
+        queued_count.store(queued.size(), std::memory_order_release);
+    }
+
+    /// The value the last queued release writes to the word, the base of a later reduction.
+    [[nodiscard]] std::optional<u32> LastQueued(u64 device_address) {
+        if (queued_count.load(std::memory_order_acquire) == 0) {
+            return std::nullopt;
+        }
+        std::scoped_lock lk{mutex};
+        const auto it = std::ranges::find_if(queued.rbegin(), queued.rend(), [&](const Queued& q) {
+            return q.address == device_address;
+        });
+        return it == queued.rend() ? std::nullopt : std::optional<u32>{it->value};
+    }
+
+    /// EDEN_NX2_RELEASE_VERIFY: at a queued release's retirement, compare the value written
+    /// (none when the write was dropped) with the one predicted at queue time, which acquires
+    /// already used. A mismatch means a write the queue did not see (CPU or another engine).
+    static void Verify(u64 device_address, u32 predicted, std::optional<u32> written) {
+        static const bool enabled = std::getenv("EDEN_NX2_RELEASE_VERIFY") != nullptr;
+        if (!enabled) {
+            return;
+        }
+        static std::atomic<u64> checks{};
+        static std::atomic<u64> mismatches{};
+        static std::atomic<u64> dropped{};
+        const bool missed = !written || *written != predicted;
+        if (!written) {
+            dropped.fetch_add(1, std::memory_order_relaxed);
+        }
+        if (missed && mismatches.fetch_add(1, std::memory_order_relaxed) < 32) {
+            LOG_WARNING(HW_GPU, "Queued release at {:#x}: predicted {:#x}, written {}",
+                        device_address, predicted,
+                        written ? fmt::format("{:#x}", *written) : std::string{"none (dropped)"});
+        }
+        if ((checks.fetch_add(1, std::memory_order_relaxed) + 1) % 4096 == 0) {
+            LOG_INFO(HW_GPU, "Queued release verify: {} checked, {} mismatched ({} dropped)",
+                     checks.load(), mismatches.load(), dropped.load());
+        }
+    }
+
+    /// Whether a queued, not yet written GPU release meets the acquire.
+    [[nodiscard]] bool QueuedMatches(u64 device_address, u32 value, u32 operation) {
+        if (queued_count.load(std::memory_order_acquire) == 0) {
+            return false;
+        }
+        std::scoped_lock lk{mutex};
+        return std::ranges::any_of(queued, [&](const Queued& q) {
+            return q.address == device_address && Matches(operation, value, q.value);
+        });
+    }
+
     /// A GPU write of value to the u32 at device_address.
     void OnWrite(u64 device_address, u32 value) {
         if (count.load(std::memory_order_acquire) == 0) {
@@ -571,22 +654,35 @@ private:
         std::atomic<bool> latched{};
     };
 
-    static bool Matches(const Slot& slot, u32 current) {
-        switch (slot.operation) {
+    static bool Matches(u32 operation, u32 expected, u32 current) {
+        switch (operation) {
         case AcquireEqual:
-            return current == slot.value;
+            return current == expected;
         case AcquireGequal:
-            return current >= slot.value;
+            return current >= expected;
         case AcquireMask:
-            return (current & slot.value) != 0;
+            return (current & expected) != 0;
         default:
             return false;
         }
     }
 
+    static bool Matches(const Slot& slot, u32 current) {
+        return Matches(slot.operation, slot.value, current);
+    }
+
+    struct Queued {
+        u64 address;
+        u32 value;
+    };
+
+    static constexpr size_t MaxQueued = 4096;
+
     std::mutex mutex; ///< Held to fill, empty and latch slots
     std::array<Slot, MaxWaiters> slots{};
     std::atomic<size_t> count{};
+    std::vector<Queued> queued;
+    std::atomic<size_t> queued_count{};
 };
 
 } // namespace Tegra
