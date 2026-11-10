@@ -98,9 +98,9 @@ std::string DiscordImpl::GetGameString(const std::string& title) {
     return icon_name;
 }
 
-static constexpr char DEFAULT_DISCORD_TEXT[] = "Lichii is an emulator for the Nintendo Switch";
+static constexpr char DEFAULT_DISCORD_TEXT[] = "Bunx2 is an experimental Nintendo Switch emulator";
 static constexpr char DEFAULT_DISCORD_IMAGE[] =
-    "https://raw.githubusercontent.com/Djihads80/Eglantine/refs/heads/nx2/dist/Eglantine.png";
+    "https://raw.githubusercontent.com/sheepbun/Bunx2/refs/heads/main/dist/branding/png/bunx2-512.png";
 
 void DiscordImpl::UpdateGameStatus(std::string_view game_url, bool has_boxart) {
     const std::string url = std::string{has_boxart ? game_url : DEFAULT_DISCORD_IMAGE};

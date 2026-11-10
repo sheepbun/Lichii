@@ -26,7 +26,7 @@ For more information on the license header script, run `.ci/license-header.sh -h
 
 ## Pull Requests
 
-Push every branch to, and open every pull request on, [sheepbun/Lichii](https://github.com/sheepbun/Lichii). See [CONTRIBUTING.md](../CONTRIBUTING.md).
+Push every branch to, and open every pull request on, [sheepbun/Bunx2](https://github.com/sheepbun/Bunx2). See [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 Pull requests are only to be merged by core developers when properly tested and discussions conclude on Discord or other communication channels. Labels are recommended but not required. However, all PRs MUST be namespaced and optionally typed:
 

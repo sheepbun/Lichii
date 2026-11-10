@@ -36,7 +36,7 @@ constexpr std::size_t RandomSize = 160 * 1024 + 77;
 
 FileSys::VirtualFile OpenFixture(std::string_view name) {
     static const auto filesystem = std::make_shared<FileSys::RealVfsFilesystem>();
-    return filesystem->OpenFile(std::string(LICHII_NX_FIXTURE_DIR) + "/" + std::string(name),
+    return filesystem->OpenFile(std::string(BUNX2_NX_FIXTURE_DIR) + "/" + std::string(name),
                                 FileSys::OpenMode::Read);
 }
 

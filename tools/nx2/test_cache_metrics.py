@@ -44,7 +44,7 @@ def summary(t, hist, builds=(2, 1), lookups=(90, 5, 3, 2, 10, 1), gfx_ms=40.0, c
 
 
 TRACE_LOG = "".join([
-    line(0.01, "Lichii Version: Lichii 1.0 | nx2-abcdef1", "Frontend <Info> qt_common.cpp:245:x: "),
+    line(0.01, "Bunx2 Version: Bunx2 1.0 | main-abcdef1", "Frontend <Info> qt_common.cpp:245:x: "),
     line(1.00, "Booting game: 0400486024DEC000 | Ocarina | 1.0", "Frontend <Info> main_window.cpp:1:x: "),
     line(1.10, "Nx2Boot event=boot_start mono_s=100.000 commit_mib=500.0 peak_commit_mib=510.0"),
     line(3.00, "Nx2Boot event=shader_load_begin mono_s=101.900 commit_mib=900.0 peak_commit_mib=900.0"),
@@ -105,7 +105,7 @@ class CacheMetricsTest(unittest.TestCase):
         result = cache_metrics.parse_log(self.write("trace.txt", TRACE_LOG))
         self.assertTrue(result["trace"])
         self.assertEqual(result["program_id"], "0400486024DEC000")
-        self.assertEqual(result["build"], "Lichii 1.0 | nx2-abcdef1")
+        self.assertEqual(result["build"], "Bunx2 1.0 | main-abcdef1")
         self.assertAlmostEqual(result["boot_to_first_frame_s"], 203.9)
         self.assertEqual(result["loading_shaders_s"], 6.0)
         self.assertEqual(result["precache_s"], 190.0)
@@ -167,6 +167,7 @@ class CacheMetricsTest(unittest.TestCase):
     def test_fallback_lines(self):
         result = cache_metrics.parse_log(self.write("old.txt", OLD_LOG))
         self.assertFalse(result["trace"])
+        self.assertEqual(result["build"], "Lichii 0.9 | nx2-0000001")
         self.assertEqual(result["loading_shaders_s"], 12.5)
         self.assertIn("fallback", result["sources"]["loading_shaders_s"])
         self.assertEqual(result["precache_s"], 42.5)

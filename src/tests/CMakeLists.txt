@@ -224,7 +224,7 @@ if (TARGET dynarmic::dynarmic)
 endif()
 
 target_compile_definitions(tests PRIVATE
-    LICHII_NX_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/core/nx_fixtures")
+    BUNX2_NX_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/core/nx_fixtures")
 
 add_test(NAME tests COMMAND tests)
 

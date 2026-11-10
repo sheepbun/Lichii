@@ -47,13 +47,13 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </message>
     <message>
         <location filename="../../src/yuzu/aboutdialog.ui" line="14"/>
-        <source>About Lichii</source>
-        <translation>Acerca de Lichii</translation>
+        <source>About Bunx2</source>
+        <translation>Acerca de Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/aboutdialog.ui" line="72"/>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Lichii&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Lichii&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Bunx2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Bunx2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/aboutdialog.ui" line="98"/>
@@ -64,7 +64,7 @@ hr { height: 1px; border-width: 0; }
 li.unchecked::marker { content: &quot;\2610&quot;; }
 li.checked::marker { content: &quot;\2612&quot;; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:&apos;Noto Sans&apos;; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:&apos;MS Shell Dlg 2&apos;; font-size:12pt;&quot;&gt;Lichii is an experimental open-source emulator for the Nintendo Switch 2, based on Eglantine and Eden. &lt;br /&gt;&lt;br /&gt;This software should not be used to play games you have not legally obtained.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:&apos;MS Shell Dlg 2&apos;; font-size:12pt;&quot;&gt;Bunx2 is an experimental open-source emulator for the Nintendo Switch 2, based on Eglantine and Eden. &lt;br /&gt;&lt;br /&gt;This software should not be used to play games you have not legally obtained.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
@@ -72,7 +72,7 @@ hr { height: 1px; border-width: 0; }
 li.unchecked::marker { content: &quot;\2610&quot;; }
 li.checked::marker { content: &quot;\2612&quot;; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:&apos;Noto Sans&apos;; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:&apos;MS Shell Dlg 2&apos;; font-size:12pt;&quot;&gt;Lichii es un emulador experimental de código abierto para Nintendo Switch 2, basado en Eglantine y Eden. &lt;br /&gt;&lt;br /&gt;Este software no debe usarse para jugar juegos que no haya obtenido legalmente.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:&apos;MS Shell Dlg 2&apos;; font-size:12pt;&quot;&gt;Bunx2 es un emulador experimental de código abierto para Nintendo Switch 2, basado en Eglantine y Eden. &lt;br /&gt;&lt;br /&gt;Este software no debe usarse para jugar juegos que no haya obtenido legalmente.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/aboutdialog.ui" line="131"/>
@@ -81,8 +81,8 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </message>
     <message>
         <location filename="../../src/yuzu/aboutdialog.ui" line="147"/>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;&amp;quot;Nintendo Switch&amp;quot; is a trademark of Nintendo. Lichii is not affiliated with Nintendo in any way.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;&amp;quot;Nintendo Switch&amp;quot; es una marca registrada de Nintendo. Lichii no está afiliado a Nintendo de ninguna manera.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;&amp;quot;Nintendo Switch&amp;quot; is a trademark of Nintendo. Bunx2 is not affiliated with Nintendo in any way.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:7pt;&quot;&gt;&amp;quot;Nintendo Switch&amp;quot; es una marca registrada de Nintendo. Bunx2 no está afiliado a Nintendo de ninguna manera.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
 </context>
 <context>
@@ -2206,10 +2206,10 @@ Enabling it bypasses such prompts and directly exits the emulation.</source>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="155"/>
         <source>Runs a Switch 2 game&apos;s own DLSS (its upscaling network, translated for this GPU) instead of AMD FSR 3.1 in its place.
-AMD FSR 3.1 still draws while the network is checked, when it can&apos;t run on this GPU, with resolution scaling, and for the rest of the session if its output fails Lichii&apos;s checks.
+AMD FSR 3.1 still draws while the network is checked, when it can&apos;t run on this GPU, with resolution scaling, and for the rest of the session if its output fails Bunx2&apos;s checks.
 Takes effect when a game starts.</source>
         <translation>Ejecuta el DLSS propio de un juego de Switch 2 (su red de reescalado, traducida para esta GPU) en lugar de AMD FSR 3.1.
-AMD FSR 3.1 sigue dibujando mientras se verifica la red, cuando no puede ejecutarse en esta GPU, con escalado de resolución y durante el resto de la sesión si su salida no pasa las comprobaciones de Lichii.
+AMD FSR 3.1 sigue dibujando mientras se verifica la red, cuando no puede ejecutarse en esta GPU, con escalado de resolución y durante el resto de la sesión si su salida no pasa las comprobaciones de Bunx2.
 Se aplica al iniciar un juego.</translation>
     </message>
     <message>
@@ -2246,12 +2246,12 @@ También ajusta la nitidez de los filtros adaptables de ventana AMD FSR 1 y SGSR
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="170"/>
         <source>Uses NVIDIA DLSS on GeForce RTX cards in place of a Switch 2 game&apos;s own DLSS, instead of AMD FSR 3.1.
-Needs NVIDIA&apos;s Streamline loader, and NVIDIA DLSS unless the NVIDIA app has downloaded it; Lichii does not ship NVIDIA&apos;s files. Use the download button below.
+Needs NVIDIA&apos;s Streamline loader, and NVIDIA DLSS unless the NVIDIA app has downloaded it; Bunx2 does not ship NVIDIA&apos;s files. Use the download button below.
 Fire Emblem: Fortune&apos;s Weave also needs EDEN_NX2_DLSS_REPLACEMENT=dlss. Without that override, its spatial workaround remains active.
 In The Legend of Zelda: Ocarina of Time it replaces the game&apos;s upscaler at 1x resolution scale.
 Takes effect when a game starts.</source>
         <translation>Usa NVIDIA DLSS en tarjetas GeForce RTX en lugar del DLSS propio de un juego de Switch 2, en vez de AMD FSR 3.1.
-Necesita el cargador Streamline de NVIDIA, y también NVIDIA DLSS salvo que la aplicación de NVIDIA ya lo haya descargado; Lichii no incluye los archivos de NVIDIA. Use el botón de descarga de abajo.
+Necesita el cargador Streamline de NVIDIA, y también NVIDIA DLSS salvo que la aplicación de NVIDIA ya lo haya descargado; Bunx2 no incluye los archivos de NVIDIA. Use el botón de descarga de abajo.
 Fire Emblem: Fortune&apos;s Weave también necesita EDEN_NX2_DLSS_REPLACEMENT=dlss. Sin esa variable, su solución alternativa espacial sigue activa.
 En The Legend of Zelda: Ocarina of Time reemplaza el reescalador del juego con escala de resolución 1x.
 Se aplica al iniciar un juego.</translation>
@@ -3121,8 +3121,8 @@ Esperar detiene la GPU hasta que la canalización esté lista (no faltan efectos
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_debug.ui" line="787"/>
-        <source>**This will be reset automatically when Lichii closes.</source>
-        <translation>**Esto se restablecerá automáticamente cuando Lichii se cierre.</translation>
+        <source>**This will be reset automatically when Bunx2 closes.</source>
+        <translation>**Esto se restablecerá automáticamente cuando Bunx2 se cierre.</translation>
     </message>
 </context>
 <context>
@@ -3262,8 +3262,8 @@ Esperar detiene la GPU hasta que la canalización esté lista (no faltan efectos
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure.ui" line="20"/>
-        <source>Lichii Configuration</source>
-        <translation>Configuración de Lichii</translation>
+        <source>Bunx2 Configuration</source>
+        <translation>Configuración de Bunx2</translation>
     </message>
 </context>
 <context>
@@ -3560,8 +3560,8 @@ Would you like to delete the old save data?</source>
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_general.cpp" line="101"/>
-        <source>Lichii</source>
-        <translation>Lichii</translation>
+        <source>Bunx2</source>
+        <translation>Bunx2</translation>
     </message>
 </context>
 <context>
@@ -4167,8 +4167,8 @@ Would you like to delete the old save data?</source>
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_input_advanced.ui" line="2659"/>
-        <source>Requires restarting Lichii</source>
-        <translation>Requiere reiniciar Lichii</translation>
+        <source>Requires restarting Bunx2</source>
+        <translation>Requiere reiniciar Bunx2</translation>
     </message>
 </context>
 <context>
@@ -4900,8 +4900,8 @@ Para invertir los ejes, mueve primero el joystick de manera vertical, y luego ho
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_motion_touch.cpp" line="166"/>
-        <source>Lichii</source>
-        <translation>Lichii</translation>
+        <source>Bunx2</source>
+        <translation>Bunx2</translation>
     </message>
 </context>
 <context>
@@ -5963,8 +5963,8 @@ Arrastre los puntos para cambiar de posición, o haga doble clic en las celdas d
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_touchscreen_advanced.ui" line="26"/>
-        <source>Warning: The settings in this page affect the inner workings of Lichii&apos;s emulated touchscreen. Changing them may result in undesirable behavior, such as the touchscreen partially or not working. You should only use this page if you know what you are doing.</source>
-        <translation>Advertencia: Los ajustes de esta página afectan al funcionamiento interno de la pantalla táctil emulada de Lichii. Cambiarlos puede provocar comportamientos indeseados, por ejemplo que la pantalla táctil funcione solo en parte o no funcione. Solo debería usar esta página si sabe lo que está haciendo.</translation>
+        <source>Warning: The settings in this page affect the inner workings of Bunx2&apos;s emulated touchscreen. Changing them may result in undesirable behavior, such as the touchscreen partially or not working. You should only use this page if you know what you are doing.</source>
+        <translation>Advertencia: Los ajustes de esta página afectan al funcionamiento interno de la pantalla táctil emulada de Bunx2. Cambiarlos puede provocar comportamientos indeseados, por ejemplo que la pantalla táctil funcione solo en parte o no funcione. Solo debería usar esta página si sabe lo que está haciendo.</translation>
     </message>
 </context>
 <context>
@@ -6283,8 +6283,8 @@ Arrastre los puntos para cambiar de posición, o haga doble clic en las celdas d
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_web.ui" line="25"/>
-        <source>Lichii Web Service</source>
-        <translation>Servicio web de Lichii</translation>
+        <source>Bunx2 Web Service</source>
+        <translation>Servicio web de Bunx2</translation>
     </message>
 </context>
 <context>
@@ -6405,18 +6405,18 @@ Arrastre los puntos para cambiar de posición, o haga doble clic en las celdas d
     </message>
     <message>
         <location filename="../../src/yuzu/deps_dialog.ui" line="14"/>
-        <source>Lichii Dependencies</source>
-        <translation>Dependencias de Lichii</translation>
+        <source>Bunx2 Dependencies</source>
+        <translation>Dependencias de Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/deps_dialog.ui" line="72"/>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Lichii Dependencies&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Dependencias de Lichii&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Bunx2 Dependencies&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:28pt;&quot;&gt;Dependencias de Bunx2&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/deps_dialog.ui" line="85"/>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The projects that make Lichii possible&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Los proyectos que hacen posible Lichii&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The projects that make Bunx2 possible&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Los proyectos que hacen posible Bunx2&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
 </context>
 <context>
@@ -6639,8 +6639,8 @@ Por favor, vaya a Configuración -&gt; Sistema -&gt; Red y selecciona una interf
     </message>
     <message>
         <location filename="../../src/yuzu/bootmanager.cpp" line="866"/>
-        <source>Lichii has not been compiled with OpenGL support.</source>
-        <translation>Lichii no se compiló con soporte para OpenGL.</translation>
+        <source>Bunx2 has not been compiled with OpenGL support.</source>
+        <translation>Bunx2 no se compiló con soporte para OpenGL.</translation>
     </message>
 </context>
 <context>
@@ -7258,8 +7258,8 @@ Mensaje de depuración:</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_hotkeys.cpp" line="29"/>
-        <source>Exit Lichii</source>
-        <translation>Salir de Lichii</translation>
+        <source>Exit Bunx2</source>
+        <translation>Salir de Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/uisettings.cpp" line="45"/>
@@ -8820,23 +8820,23 @@ Would you like to bypass this and exit anyway?</source>
     </message>
     <message>
         <location filename="../../src/yuzu/main.ui" line="14"/>
-        <source>Lichii</source>
-        <translation>Lichii</translation>
+        <source>Bunx2</source>
+        <translation>Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main.ui" line="62"/>
-        <source>Open &amp;Lichii Folders</source>
-        <translation>Abrir carpetas de &amp;Lichii</translation>
+        <source>Open &amp;Bunx2 Folders</source>
+        <translation>Abrir carpetas de &amp;Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main.ui" line="295"/>
-        <source>&amp;About Lichii</source>
-        <translation>&amp;Acerca de Lichii</translation>
+        <source>&amp;About Bunx2</source>
+        <translation>&amp;Acerca de Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main.ui" line="558"/>
-        <source>&amp;Lichii Dependencies</source>
-        <translation>&amp;Dependencias de Lichii</translation>
+        <source>&amp;Bunx2 Dependencies</source>
+        <translation>&amp;Dependencias de Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="1690"/>
@@ -8870,8 +8870,8 @@ Would you like to bypass this and exit anyway?</source>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="1948"/>
-        <source>Lichii could not allocate the game&apos;s memory. Close other applications and check that your system has enough available memory and paging-file space, then try again.</source>
-        <translation>Lichii no pudo reservar la memoria del juego. Cierre otras aplicaciones y compruebe que su sistema tenga suficiente memoria disponible y espacio en el archivo de paginación; luego inténtelo de nuevo.</translation>
+        <source>Bunx2 could not allocate the game&apos;s memory. Close other applications and check that your system has enough available memory and paging-file space, then try again.</source>
+        <translation>Bunx2 no pudo reservar la memoria del juego. Cierre otras aplicaciones y compruebe que su sistema tenga suficiente memoria disponible y espacio en el archivo de paginación; luego inténtelo de nuevo.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="2014"/>
@@ -8904,12 +8904,12 @@ Would you like to bypass this and exit anyway?</source>
 
 Vulkan, 1x resolution, GPU Fast, asynchronous shaders, BC3, conservative VRAM, reactive flushing off, FIFO Relaxed VSync, handheld mode, ScaleForce, and FXAA.
 
-They apply to Mario Kart World until Lichii is closed. Your saved settings are not changed.</source>
+They apply to Mario Kart World until Bunx2 is closed. Your saved settings are not changed.</source>
         <translation>¿Desea usar la configuración recomendada para Mario Kart World?
 
 Vulkan, resolución 1x, GPU Rápido, sombreadores asíncronos, BC3, VRAM conservadora, vaciado reactivo desactivado, VSync FIFO Relaxed, modo portátil, ScaleForce y FXAA.
 
-Se aplica a Mario Kart World hasta que cierre Lichii. Su configuración guardada no cambia.</translation>
+Se aplica a Mario Kart World hasta que cierre Bunx2. Su configuración guardada no cambia.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="2130"/>
@@ -9100,8 +9100,8 @@ Puede cambiar esto en Configurar, Gráficos, Avanzado.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="4878"/>
-        <source>Could not check for updates: GitHub rate limit reached. Lichii will try again at the next start.</source>
-        <translation>No se pudo buscar actualizaciones: se alcanzó el límite de consultas de GitHub. Lichii lo intentará de nuevo en el próximo inicio.</translation>
+        <source>Could not check for updates: GitHub rate limit reached. Bunx2 will try again at the next start.</source>
+        <translation>No se pudo buscar actualizaciones: se alcanzó el límite de consultas de GitHub. Bunx2 lo intentará de nuevo en el próximo inicio.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="4885"/>
@@ -9195,20 +9195,20 @@ Puede cambiar esto en Configurar, Gráficos, Avanzado.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="5362"/>
-        <source>Restart Lichii to apply the X11 backend.</source>
-        <translation>Reinicie Lichii para aplicar el backend X11.</translation>
+        <source>Restart Bunx2 to apply the X11 backend.</source>
+        <translation>Reinicie Bunx2 para aplicar el backend X11.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="5481"/>
-        <source>Are you sure you want to close Lichii?</source>
-        <translation>¿Seguro que desea cerrar Lichii?</translation>
+        <source>Are you sure you want to close Bunx2?</source>
+        <translation>¿Seguro que desea cerrar Bunx2?</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/main_window.cpp" line="5597"/>
-        <source>The currently running application has requested Lichii to not exit.
+        <source>The currently running application has requested Bunx2 to not exit.
 
 Would you like to bypass this and exit anyway?</source>
-        <translation>La aplicación en ejecución ha solicitado a Lichii que no se cierre.
+        <translation>La aplicación en ejecución ha solicitado a Bunx2 que no se cierre.
 
 ¿Desea ignorarlo y salir de todas formas?</translation>
     </message>
@@ -9543,8 +9543,8 @@ Proceed anyway?</source>
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/system/new_user_dialog.ui" line="60"/>
-        <source>Lichii</source>
-        <translation>Lichii</translation>
+        <source>Bunx2</source>
+        <translation>Bunx2</translation>
     </message>
 </context>
 <context>
@@ -11599,17 +11599,17 @@ Seleccionando &quot;Desde Eden&quot;, los datos de guardado anteriores alojados 
     </message>
     <message>
         <location filename="../../src/yuzu/ryujinx_dialog.ui" line="26"/>
-        <source>Linking save data to Ryujinx lets both Ryujinx and Lichii reference the same save files for your games.
+        <source>Linking save data to Ryujinx lets both Ryujinx and Bunx2 reference the same save files for your games.
 
-By selecting &quot;From Lichii&quot;, previous save data stored in Ryujinx will be deleted, and vice versa for &quot;From Ryujinx&quot;.</source>
-        <translation>Vincular los datos de guardado con Ryujinx permite que Ryujinx y Lichii usen los mismos archivos de guardado de sus juegos.
+By selecting &quot;From Bunx2&quot;, previous save data stored in Ryujinx will be deleted, and vice versa for &quot;From Ryujinx&quot;.</source>
+        <translation>Vincular los datos de guardado con Ryujinx permite que Ryujinx y Bunx2 usen los mismos archivos de guardado de sus juegos.
 
-Si elige &quot;Desde Lichii&quot;, se eliminarán los datos de guardado anteriores almacenados en Ryujinx, y al revés si elige &quot;Desde Ryujinx&quot;.</translation>
+Si elige &quot;Desde Bunx2&quot;, se eliminarán los datos de guardado anteriores almacenados en Ryujinx, y al revés si elige &quot;Desde Ryujinx&quot;.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/ryujinx_dialog.ui" line="40"/>
-        <source>From Lichii</source>
-        <translation>Desde Lichii</translation>
+        <source>From Bunx2</source>
+        <translation>Desde Bunx2</translation>
     </message>
 </context>
 <context>
@@ -11788,8 +11788,8 @@ Código de error: %3</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/updater/update_dialog.cpp" line="229"/>
-        <source>Another Lichii window is already updating this installation.</source>
-        <translation>Otra ventana de Lichii ya está actualizando esta instalación.</translation>
+        <source>Another Bunx2 window is already updating this installation.</source>
+        <translation>Otra ventana de Bunx2 ya está actualizando esta instalación.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/updater/update_dialog.cpp" line="245"/>
@@ -11832,10 +11832,10 @@ Restart now?</source>
     </message>
     <message>
         <location filename="../../src/yuzu/updater/update_dialog.cpp" line="308"/>
-        <source>Lichii will close, install the update and start again. The previous version is kept, and your settings and data are not changed.
+        <source>Bunx2 will close, install the update and start again. The previous version is kept, and your settings and data are not changed.
 
 Restart now?</source>
-        <translation>Lichii se cerrará, instalará la actualización y se volverá a iniciar. La versión anterior se conserva, y su configuración y sus datos no cambian.
+        <translation>Bunx2 se cerrará, instalará la actualización y se volverá a iniciar. La versión anterior se conserva, y su configuración y sus datos no cambian.
 
 ¿Desea reiniciar ahora?</translation>
     </message>
@@ -11954,8 +11954,8 @@ Restart now?</source>
     </message>
     <message>
         <location filename="../../src/yuzu/compatibility_report.cpp" line="190"/>
-        <source>Lichii build</source>
-        <translation>Compilación de Lichii</translation>
+        <source>Bunx2 build</source>
+        <translation>Compilación de Bunx2</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/compatibility_report.cpp" line="191"/>
@@ -12757,8 +12757,8 @@ o haga clic para buscarlo</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/shader_warm_dialog.cpp" line="188"/>
-        <source>This game keeps its shaders in a format Lichii can&apos;t read, so none are prepared from the game files.</source>
-        <translation>Este juego guarda sus sombreadores en un formato que Lichii no puede leer, así que no se prepara ninguno a partir de los archivos del juego.</translation>
+        <source>This game keeps its shaders in a format Bunx2 can&apos;t read, so none are prepared from the game files.</source>
+        <translation>Este juego guarda sus sombreadores en un formato que Bunx2 no puede leer, así que no se prepara ninguno a partir de los archivos del juego.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/shader_warm_dialog.cpp" line="190"/>
@@ -12895,8 +12895,8 @@ o haga clic para buscarlo</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/nvidia_dlss_panel.cpp" line="462"/>
-        <source>Lichii will download %1 from NVIDIA&apos;s Streamline %2 release on GitHub into %3.&lt;br&gt;These files are NVIDIA&apos;s, under NVIDIA&apos;s licence terms below.</source>
-        <translation>Lichii descargará %1 de la versión %2 de Streamline de NVIDIA en GitHub a %3.&lt;br&gt;Estos archivos son de NVIDIA y están sujetos a los términos de licencia de NVIDIA que aparecen abajo.</translation>
+        <source>Bunx2 will download %1 from NVIDIA&apos;s Streamline %2 release on GitHub into %3.&lt;br&gt;These files are NVIDIA&apos;s, under NVIDIA&apos;s licence terms below.</source>
+        <translation>Bunx2 descargará %1 de la versión %2 de Streamline de NVIDIA en GitHub a %3.&lt;br&gt;Estos archivos son de NVIDIA y están sujetos a los términos de licencia de NVIDIA que aparecen abajo.</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/nvidia_dlss_panel.cpp" line="472"/>

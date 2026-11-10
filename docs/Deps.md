@@ -1,6 +1,6 @@
 # Dependencies
 
-Lichii is built only on Arch Linux x86_64 (see the [build guide](Build.md)). It needs:
+Bunx2 is built only on Arch Linux x86_64 (see the [build guide](Build.md)). It needs:
 
 * [GCC](https://gcc.gnu.org/) 11 or later (Arch ships GCC 16)
 * **[CMake](https://www.cmake.org/)** 3.31+

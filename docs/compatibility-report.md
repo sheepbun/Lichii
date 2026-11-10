@@ -1,6 +1,9 @@
 # Opt-in desktop compatibility reports
 
-After stopping a Switch 2 game, right-click that game and choose **Submit compatibility report**. The action is available only for the latest session in the current Lichii process. Starting another game clears that session, and closing Lichii discards it. This feature does not store play history.
+> [!NOTE]
+> This reporter was written for Lichii. It submits to Lichii's compatibility website, [lichii.zortos.me](https://lichii.zortos.me), which the Lichii project runs. Bunx2 does not run that service and has no agreement to send reports to it, so Bunx2 builds do not offer the action. The implementation and its tests remain for review. A build configured with `-DBUNX2_COMPATIBILITY_REPORTS=ON` shows it again; its reports identify themselves as `Bunx2 <version> (<commit>)` and use the same v1 API, including the `X-Lichii-Client: desktop/1` header that API expects. Do not turn it on for builds you distribute unless the website's operators agree to receive Bunx2 reports.
+
+After stopping a Switch 2 game, right-click that game and choose **Submit compatibility report**. The action is available only for the latest session in the current emulator process. Starting another game clears that session, and closing the emulator discards it. This feature does not store play history.
 
 Search the website catalog, select the exact game, and press **Confirm game**. Search is explicit and supports catalog pages. A Nintendo title ID is never used as a catalog ID. The search box uses control metadata or the loader's known title, including NUP package titles. Missing title metadata leaves the search blank rather than using a filename.
 

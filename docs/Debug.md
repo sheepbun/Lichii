@@ -68,15 +68,15 @@ RenderDoc can capture Eden's Vulkan output when its Vulkan layer is loaded befor
 
 ## Usage
 
-Install it with `sudo pacman -S renderdoc`. You can either use the RenderDoc UI (`qrenderdoc`) to launch Lichii, or enable RenderDoc's Vulkan layer for one run:
+Install it with `sudo pacman -S renderdoc`. You can either use the RenderDoc UI (`qrenderdoc`) to launch Bunx2, or enable RenderDoc's Vulkan layer for one run:
 
 ```sh
-ENABLE_VULKAN_RENDERDOC_CAPTURE=1 ./build/bin/lichii
+ENABLE_VULKAN_RENDERDOC_CAPTURE=1 ./build/bin/bunx2
 ```
 
 Captures go to `/tmp/RenderDoc` by default.
 
-Press RenderDoc's capture hotkey, usually `F12`, to capture a frame. To stop using RenderDoc, close Lichii and launch it again without `ENABLE_VULKAN_RENDERDOC_CAPTURE`.
+Press RenderDoc's capture hotkey, usually `F12`, to capture a frame. To stop using RenderDoc, close Bunx2 and launch it again without `ENABLE_VULKAN_RENDERDOC_CAPTURE`.
 
 ## Eden Hotkey
 

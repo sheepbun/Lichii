@@ -147,9 +147,9 @@ void UpdateDialog::Restart(QWidget* window, const QString& target) {
 bool UpdateDialog::LaunchInstaller(QWidget* window, const QString& staging) {
     // The helper runs from a copy, because the installed one is replaced along with everything else.
     const QString helper =
-        QCoreApplication::applicationDirPath() + QStringLiteral("/lichii-updater.exe");
+        QCoreApplication::applicationDirPath() + QStringLiteral("/bunx2-updater.exe");
     const QString copy = QDir::temp().filePath(
-        QStringLiteral("lichii-updater-%1.exe").arg(QCoreApplication::applicationPid()));
+        QStringLiteral("bunx2-updater-%1.exe").arg(QCoreApplication::applicationPid()));
     QFile::remove(copy);
     if (!QFile::copy(helper, copy)) {
         LOG_ERROR(Frontend, "Could not copy the installer helper {}", helper.toStdString());
@@ -181,7 +181,7 @@ void UpdateDialog::Download() {
         const std::filesystem::path exe{QCoreApplication::applicationFilePath().toStdWString()};
         if (UpdateInstaller::CanReplace(exe) &&
             QFile::exists(QCoreApplication::applicationDirPath() +
-                          QStringLiteral("/lichii-updater.exe"))) {
+                          QStringLiteral("/bunx2-updater.exe"))) {
             InstallOnRestart(exe);
             return;
         }
@@ -228,7 +228,7 @@ void UpdateDialog::InstallInPlace(const std::filesystem::path& target) {
     const UpdateInstaller::Lock lock{UpdateInstaller::LockPath(target)};
     if (!lock.Held()) {
         QtCommon::Frontend::Critical(tr("Failed to install the update"),
-                                     tr("Another Lichii window is already updating this "
+                                     tr("Another Bunx2 window is already updating this "
                                         "installation."));
         return;
     }
@@ -307,7 +307,7 @@ void UpdateDialog::InstallOnRestart(const std::filesystem::path& exe) {
 
     const auto button = QtCommon::Frontend::Question(
         tr("Update Ready"),
-        tr("Lichii will close, install the update and start again. The previous version is "
+        tr("Bunx2 will close, install the update and start again. The previous version is "
            "kept, and your settings and data are not changed.\n\nRestart now?"),
         QtCommon::Frontend::Yes | QtCommon::Frontend::No);
     if (button != QtCommon::Frontend::Yes ||

@@ -85,7 +85,7 @@ program-level context (uniform-bank use, call linkage) can differ.
 ### 3. Dump run (when the log is exhausted)
 
 ```bash
-EDEN_NX2_SHADER_DUMP=<existing plain dir> EDEN_NX2_TENSOR=1 <repo>/build/bin/eglantine
+EDEN_NX2_SHADER_DUMP=<existing plain dir> EDEN_NX2_TENSOR=1 <repo>/build/bin/bunx2
 ```
 
 Writes `<key>-gfx-<addr>.bin` / `-cs-` (16 bytes per instruction, no header), rejected programs
@@ -127,7 +127,7 @@ constants or are dropped with a warning).
 - Add a test with the real logged words to `src/tests/video_core/ampere_lowering.cpp`, checking
   emitted fields (type, offset mode, DC, source registers).
 - `ninja -C build -j$(nproc) tests && ./build/bin/tests "[ampere]"`, then the full `tests`, then the
-  `yuzu` target (links `bin/eglantine`).
+  `yuzu` target (links `bin/bunx2`).
 - Re-run step 2 on `uniq.txt`. Only HMMA (opt-in) should remain. Say "compiled and unit-tested,
   not run in game" until the user's dump run confirms it.
 

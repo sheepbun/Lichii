@@ -36,8 +36,10 @@ These options control dependencies.
   - Needed for gyroscopes
 - `ENABLE_DEBUG_TOOLS` (OFF) Enables debugging and development tools, see [tools](../tools/README.md).
 - `ENABLE_WERROR` (ON) Enables warnings as errors (-Werror).
-- `LICHII_FUZZERS` (OFF) Builds the libFuzzer harnesses for the game-file parsers and instruments the whole build with ASan and UBSan, see [Fuzzing](./Fuzzing.md).
+- `BUNX2_FUZZERS` (OFF) Builds the libFuzzer harnesses for the game-file parsers and instruments the whole build with ASan and UBSan, see [Fuzzing](./Fuzzing.md).
   - Clang only
+  - `LICHII_FUZZERS`, Lichii's name for it, is still accepted with a deprecation warning.
+- `BUNX2_COMPATIBILITY_REPORTS` (OFF) Shows **Submit compatibility report** in the game list, which sends opt-in reports to Lichii's compatibility website (lichii.zortos.me). The Lichii project runs that service, not Bunx2, so it stays off; see [compatibility reports](./compatibility-report.md).
 
 ### Flavors
 
@@ -47,9 +49,10 @@ These options control executables and build flavors.
 - `NIGHTLY_BUILD` (OFF): This is only used by CI. Do not use this unless you're making your own distribution and know what you're doing.
 - `YUZU_STATIC_BUILD` (OFF) Attempt to build using static libraries if possible
   - Not supported on Linux
-- `ENABLE_UPDATE_CHECKER` (OFF) Enable update checking functionality
-  - `LICHII_BUILD_TAG` (empty) Published `build-N` tag. Builds without it never check for updates.
-  - `LICHII_BUILD_PLATFORM` (empty) Release asset platform and variant, `linux-x86_64` or `linux-x86_64-pgo`. CI sets this from its build matrix.
+- `ENABLE_UPDATE_CHECKER` (OFF) Enable update checking functionality. It looks for `build-N` releases of sheepbun/Bunx2 only. Bunx2 has published no releases yet, so the release workflow and the Arch package leave it off; the build-check workflow turns it on only to compile it.
+  - `BUNX2_BUILD_TAG` (empty) Published `build-N` tag. Builds without it never check for updates.
+  - `BUNX2_BUILD_PLATFORM` (empty) Release asset platform and variant, `linux-x86_64` or `linux-x86_64-pgo`. CI sets this from its build matrix.
+  - `LICHII_BUILD_TAG` and `LICHII_BUILD_PLATFORM`, Lichii's names for them, are still accepted with a deprecation warning.
 - `YUZU_DISABLE_LLVM` (OFF) Do not attempt to link to the LLVM demangler
   - Really only useful for CI or distribution builds
 

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 Bunx2 contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<!-- Bunx2 logo master: a white rabbit silhouette outlined in hot pink. Icons from 48 px up are
+     rendered from this file; tools/generate_bunx2_icons.py renders 16-32 px from bunx2-small.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Bunx2</title>
+  <path fill="#FFFFFF" stroke="#FF1493" stroke-width="24" stroke-linejoin="round"
+        d="M 170 476
+           C 130 476, 110 454, 108 422
+           C 80 422, 64 398, 70 374
+           C 76 350, 102 340, 122 352
+           C 150 286, 220 240, 306 224
+           C 286 194, 236 134, 218 90
+           C 208 64, 234 42, 260 56
+           C 292 78, 322 134, 338 168
+           C 330 134, 308 94, 308 64
+           C 308 34, 350 28, 358 54
+           C 372 92, 376 136, 372 164
+           C 410 168, 438 200, 444 232
+           C 448 254, 438 268, 420 272
+           C 414 288, 402 300, 386 304
+           C 394 348, 408 402, 418 436
+           C 428 444, 432 462, 418 470
+           C 412 474, 404 476, 394 476
+           Z"/>
+  <g fill="none" stroke="#FF1493" stroke-linecap="round">
+    <path stroke-width="12" d="M 314 464 C 314 402, 276 360, 220 360 C 190 360, 166 370, 150 386"/>
+    <path stroke-width="10" d="M 344 150 C 344 124, 338 98, 330 74"/>
+  </g>
+  <circle cx="398" cy="224" r="12" fill="#FF1493"/>
+</svg>

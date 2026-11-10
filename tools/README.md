@@ -20,7 +20,9 @@ Tools for Eden and other subprojects. When adding new scripts please use `#!/bin
 - `llvmpipe-run.sh`: Sets environment variables needed to run any command (or Eden) with llvmpipe.
 - `optimize-assets.sh`: Optimizes PNG assets with OptiPng.
 - `update-cpm.sh`: Updates CPM.cmake to the latest version.
-- `update-icons.sh`: Rebuild all icons (macOS, Windows, bitmaps) based on the master SVG file (`dist/dev.eden_emu.eden.svg`)
+- `generate_bunx2_icons.py`: Renders the Bunx2 application icons (`dist/branding/png/`, `dist/bunx2.ico`, `dist/bunx2.icns`, `dist/bunx2.bmp`) from `dist/branding/bunx2.svg` and `dist/branding/bunx2-small.svg`. `--check` reports committed icons that differ from a fresh render.
+    * Requires: `rsvg-convert` (librsvg), ImageMagick
+- `update-icons.sh`: Eden's script. Rebuilds Eden's icons (macOS, Windows, bitmaps, Android) from `dist/icon_variations`; Bunx2 does not use those icons for its application identity.
     * Also optimizes the master SVG
     * Requires: `png2icns` (libicns), ImageMagick, [`svgo`](https://github.com/svg/svgo)
 - `dtrace-tool.sh`

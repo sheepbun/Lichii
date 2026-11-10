@@ -19,7 +19,7 @@ Everything here is off unless its variable is set:
 
 ## Running it
 
-1. Start `build/bin/lichii` (Qt) or `build/bin/eden-cli` with `EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545`
+1. Start `build/bin/bunx2` (Qt) or `build/bin/eden-cli` with `EDEN_NX2_DEBUG_SERVER=127.0.0.1:6545`
    in the environment and boot a game. The log (`~/.local/share/eglantine/log/eden_log.txt`)
    shows `Debug server listening on 127.0.0.1:6545, dump dir ...`. The default dump directory is
    the `debug-server` folder in that log folder.
@@ -34,7 +34,7 @@ Everything here is off unless its variable is set:
    python3 -I tools/nx2/debug_mcp.py --call '{"method":"input_sequence","params":{"steps":[{"right_stick":[1,0],"frames":60},{"frames":30}]}}'
    ```
 
-   `--server` defaults to `LICHII_DEBUG_SERVER`, then `EDEN_NX2_DEBUG_SERVER`, then
+   `--server` defaults to `BUNX2_DEBUG_SERVER`, then `LICHII_DEBUG_SERVER`, then `EDEN_NX2_DEBUG_SERVER`, then
    `127.0.0.1:6545`. The
    request is `{"method": <tool>, "params": {...}}`, the format the socket uses. Adapter-only tools
    work too (`capture_image`, and `index` on `capture_frame`). On failure `--call` prints

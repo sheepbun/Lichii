@@ -24,7 +24,7 @@ EmuWindow_SDL3_VK::EmuWindow_SDL3_VK(InputCommon::InputSubsystem* input_subsyste
     : EmuWindow_SDL3{input_subsystem_, system_} {
     // The titlebar timer names the game once it has loaded.
     render_window =
-        SDL_CreateWindow("Lichii", Layout::ScreenUndocked::Width,
+        SDL_CreateWindow("Bunx2", Layout::ScreenUndocked::Width,
                          Layout::ScreenUndocked::Height,
                          SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | Nx2HiddenWindowFlags());
 

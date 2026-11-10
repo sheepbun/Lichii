@@ -1,6 +1,6 @@
 # Fuzzing the game-file parsers
 
-`-DLICHII_FUZZERS=ON` builds three libFuzzer harnesses in `src/fuzz/` and compiles the whole build with AddressSanitizer and UndefinedBehaviorSanitizer. It needs clang with its compiler-rt runtimes (`libclang-rt-<version>-dev` on Ubuntu). Use a separate build directory, since every object is instrumented.
+`-DBUNX2_FUZZERS=ON` builds three libFuzzer harnesses in `src/fuzz/` and compiles the whole build with AddressSanitizer and UndefinedBehaviorSanitizer. It needs clang with its compiler-rt runtimes (`libclang-rt-<version>-dev` on Ubuntu). Use a separate build directory, since every object is instrumented.
 
 | Harness | Input |
 |---|---|
@@ -13,7 +13,7 @@ NCA headers are normally encrypted. The NCA reader also accepts a plaintext head
 ```sh
 cmake -S . -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-    -DLICHII_FUZZERS=ON -DENABLE_WERROR=OFF -DENABLE_QT=OFF -DYUZU_CMD=OFF -DYUZU_ROOM=OFF
+    -DBUNX2_FUZZERS=ON -DENABLE_WERROR=OFF -DENABLE_QT=OFF -DYUZU_CMD=OFF -DYUZU_ROOM=OFF
 cmake --build build-fuzz --target fuzz_partition_romfs fuzz_nca fuzz_package
 mkdir -p corpus/nca && ASAN_OPTIONS=detect_leaks=0 \
     build-fuzz/bin/fuzz_nca -rss_limit_mb=3072 -malloc_limit_mb=3072 -timeout=25 corpus/nca seeds/
