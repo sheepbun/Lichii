@@ -44,10 +44,10 @@ class BenchTest(unittest.TestCase):
         self.original = tree(self.shader)
         self.session = self.root / "session"
         self.running = False
-        originals = (cache_bench.lichii_running, cache_bench.port_open)
-        cache_bench.lichii_running = lambda name: self.running
+        originals = (cache_bench.emulator_running, cache_bench.port_open)
+        cache_bench.emulator_running = lambda name: self.running
         cache_bench.port_open = lambda address: self.running
-        self.addCleanup(lambda: (setattr(cache_bench, "lichii_running", originals[0]),
+        self.addCleanup(lambda: (setattr(cache_bench, "emulator_running", originals[0]),
                                  setattr(cache_bench, "port_open", originals[1])))
         self.config = {
             "user_dir": str(self.user), "output_dir": str(self.root / "out"),
